@@ -16,7 +16,7 @@ class EmptyEnv(MiniGridEnv):
         split = 0.8,
         mode = "TRAIN",
         types = ('key', 'ball', 'box'),
-        colors = ('red', 'green', 'blue', 'purple', 'yellow', 'grey')
+        colors = ('red', 'green', 'blue', 'purple', 'yellow', 'grey', 'black', 'cyan', 'brown', 'orange')
     ):
         self.agent_start_pos = agent_start_pos
         self.agent_start_dir = agent_start_dir
@@ -43,7 +43,7 @@ class EmptyEnv(MiniGridEnv):
         self.vocabulary = None
 
         self.split = split
-        self.mode = mode
+        self.set_mode(mode)
 
         super().__init__(
             grid_size=size,
@@ -66,19 +66,17 @@ class EmptyEnv(MiniGridEnv):
                     self.vocabulary.add(word)
         return self.vocabulary
 
-    def set_train(self):
-        self.mode = "TRAIN"
+    def set_mode(self, mode):
+        if mode not in ["TRAIN", "EVAL"]:
+            raise ValueError("Unexpected value for mode")
 
-    def set_eval(self):
-        self.mode = "EVAL"
+        self.mode = mode
 
     def compute_indices(self, length):
         if self.mode == "TRAIN":
             return 0, math.floor(self.split * length)
-        elif self.mode == "EVAL":
-            return math.floor(self.split * length), length
         else:
-            raise ValueError("Unexpected value for mode")
+            return math.floor(self.split * length), length
 
     def direct_mission(self):
         # 1. Choose a target type and color
