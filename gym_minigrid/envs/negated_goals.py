@@ -8,10 +8,10 @@ class EmptyEnv(MiniGridEnv):
 
     def __init__(
         self,
-        size=8,
+        size=6,
         agent_start_pos=(1,1),
         agent_start_dir=0,
-        num_distractors=6,
+        num_distractors=1,
         types = ('key', 'ball', 'box'),
         colors = ('red', 'green', 'blue', 'purple', 'yellow', 'grey')
     ):
@@ -29,13 +29,14 @@ class EmptyEnv(MiniGridEnv):
         }
 
         self.base_templates = [
-            "Go to the object that is <not><desc>",
-            "Navigate to the object that is <not><desc>",
-            "Find the object that is <not><desc>",
+            # "Go to the object that is <not><desc>",
+            # "Navigate to the object that is <not><desc>",
+            # "Find the object that is <not><desc>",
             "Pick up the object that is <not><desc>",
-            "The goal is object that is <not><desc>",
-            "The object that is <not><desc> is the goal",
+            # "The goal is object that is <not><desc>",
+            # "The object that is <not><desc> is the goal",
         ]
+        # Thought to better resemble cloze task: "The goal is not blue"
 
         self.vocabulary = None
 
@@ -137,7 +138,7 @@ class EmptyEnv(MiniGridEnv):
                 reward = self._reward()
                 done = True
             else:
-                reward = -1
+                reward = -0.1
                 done = True
 
         return obs, reward, done, info
