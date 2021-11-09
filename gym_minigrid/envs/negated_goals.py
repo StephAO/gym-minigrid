@@ -1,3 +1,4 @@
+from numpy import mat
 from gym_minigrid.minigrid import *
 from gym_minigrid.register import register
 
@@ -12,8 +13,10 @@ class EmptyEnv(MiniGridEnv):
         agent_start_pos=(1,1),
         agent_start_dir=0,
         num_distractors=1,
+        split = 0.8,
+        mode = "TRAIN",
         types = ('key', 'ball', 'box'),
-        colors = ('red', 'green', 'blue', 'purple', 'yellow', 'grey')
+        colors = ('red', 'green', 'blue', 'purple', 'yellow', 'grey', 'black', 'cyan', 'brown', 'orange')
     ):
         self.agent_start_pos = agent_start_pos
         self.agent_start_dir = agent_start_dir
@@ -40,6 +43,9 @@ class EmptyEnv(MiniGridEnv):
 
         self.vocabulary = None
 
+        self.split = split
+        self.set_mode(mode)
+
         super().__init__(
             grid_size=size,
             max_steps=4*size*size,
@@ -61,11 +67,26 @@ class EmptyEnv(MiniGridEnv):
                     self.vocabulary.add(word)
         return self.vocabulary
 
+    def set_mode(self, mode):
+        if mode not in ["TRAIN", "EVAL"]:
+            raise ValueError("Unexpected value for mode")
+
+        self.mode = mode
+
+    def compute_indices(self, length):
+        if self.mode == "TRAIN":
+            return 0, math.floor(self.split * length)
+        else:
+            return math.floor(self.split * length), length
+
     def direct_mission(self):
         # 1. Choose a target type and color
         # 2. Create N distraction objects that cannot share the same tuple
         type_idx = self._rand_int(0, len(self.types))
-        color_idx = self._rand_int(0, len(self.colors))
+        # Updated the random selection to limit the indices accoring to the mode
+        # Train: 0 -> len * split(exclusive)
+        # Eval: len * split -> len(exclusive)
+        color_idx = self._rand_int(*self.compute_indices(len(self.colors)))
         self.target_type = self.types[type_idx]
         self.target_color = self.colors[color_idx]
         target_obj = self.type_dict[self.target_type](self.target_color)
@@ -91,7 +112,10 @@ class EmptyEnv(MiniGridEnv):
         # 2. Choose a negated description
         # 3. Create N distraction objects that share the negated description
         type_idx = self._rand_int(0, len(self.types))
-        color_idx = self._rand_int(0, len(self.colors))
+        # Updated the random selection to limit the indices accoring to the mode
+        # Train: 0 -> len * split(exclusive)
+        # Eval: len * split -> len(exclusive)
+        color_idx = self._rand_int(*self.compute_indices(len(self.colors)))
         self.target_type = self.types[type_idx]
         self.target_color = self.colors[color_idx]
         target_obj = self.type_dict[self.target_type](self.target_color)
