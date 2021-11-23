@@ -18,7 +18,7 @@ COLORS = {
     'purple': np.array([112, 39, 195]),
     'yellow': np.array([255, 255, 0]),
     'grey'  : np.array([100, 100, 100]),
-    'black' : np.array([0, 0, 0]),
+    'white' : np.array([255, 255, 255]),
     'cyan' : np.array([0, 255, 255]),
     'brown' : np.array([139, 69, 19]),
     'orange' : np.array([255, 99, 71])
@@ -34,7 +34,7 @@ COLOR_TO_IDX = {
     'purple': 3,
     'yellow': 4,
     'grey'  : 5,
-    'black' :  6,
+    'white' :  6,
     'cyan' : 7,
     'brown'  : 8,
     'orange' : 9 
@@ -1221,7 +1221,8 @@ class MiniGridEnv(gym.Env):
         obs = {
             'image': image,
             'direction': self.agent_dir,
-            'mission': self.mission
+            'mission': self.mission,
+            'target_cell': self.target_cell
         }
 
         return obs

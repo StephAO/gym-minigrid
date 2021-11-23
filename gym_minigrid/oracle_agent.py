@@ -147,8 +147,6 @@ class OracleAgent:
             obss, rewards, actions = [], [], []
             obs, target = self.reset()
             mission = obs["mission"]
-            obss.append(obs)
-            rewards.append(0)
             if self.visualize:
                 # Blocking event loop
                 self.window.show(block=False)
@@ -156,10 +154,10 @@ class OracleAgent:
             for action in self.get_sequence(target):
                 if action is None:
                     break
-                actions.append(action)
-                obs, reward, done, info = self.step(action)
                 obss.append(obs)
-                rewards.append(0)
+                obs, reward, done, info = self.step(action)
+                actions.append(action)
+                rewards.append(reward)
                 if self.visualize:
                     time.sleep(0.5)
                 if done:
@@ -168,7 +166,8 @@ class OracleAgent:
             if action is None:
                 continue
 
-            actions.append(self.env.actions.done)
+            assert sum(rewards) > 0
+            assert done
 
             demos.append( (mission, obss, actions, rewards, self.env.get_oracle_goal()) )
 
