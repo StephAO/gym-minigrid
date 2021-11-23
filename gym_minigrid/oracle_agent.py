@@ -170,7 +170,7 @@ class OracleAgent:
 
             actions.append(self.env.actions.done)
 
-            demos.append( (mission, obss, actions, rewards) )
+            demos.append( (mission, obss, actions, rewards, self.env.get_oracle_goal()) )
 
         if self.visualize:
             self.window.close()
