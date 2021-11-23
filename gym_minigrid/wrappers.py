@@ -220,7 +220,7 @@ class RGBImgPartialObsWrapper(gym.core.ObservationWrapper):
 
 class FullyObsWrapper(gym.core.ObservationWrapper):
     """
-    Fully observable gridworld using a compact grid encoding
+    Fully observable gridworld using a compact grid encoding. Target must be inferred from natural language "mission"
     """
 
     def __init__(self, env):
@@ -241,11 +241,39 @@ class FullyObsWrapper(gym.core.ObservationWrapper):
             COLOR_TO_IDX['red'],
             env.agent_dir
         ])
-
+        agent_dir_one_hot = np.zeros(4)
+        agent_dir_one_hot[env.agent_dir] = 1.
         return {
             'mission': obs['mission'],
-            'image': full_grid
+            'image': full_grid,
+            'robot_obs': np.array([*agent_dir_one_hot])
         }
+
+class EasyModeWrapper(FullyObsWrapper):
+    """
+    Fully observable gridworld that returns current position and target position as (x, y) tuples.
+    """
+    def observation(self, obs):
+        env = self.unwrapped
+        agent_dir_one_hot = np.zeros(4)
+        agent_dir_one_hot[env.agent_dir] = 1.
+        return {
+            'mission': "go to goal",
+            'visual_obs': obs['target_cell'],
+            'robot_obs': np.array([*env.agent_pos, *agent_dir_one_hot])
+        }
+
+class NoLanguageWrapper(FullyObsWrapper):
+    """
+    Fully observable gridworld using a compact grid encoding. Target is additionally provided as an (x, y) tuple so that
+    no language is needed to solve the puzzle.
+    """
+    def observation(self, obs):
+        obs_dict = super().observation(obs)
+        obs_dict['mission'] = "go to goal"
+        obs_dict['robot_obs'] = np.array([*obs['target_cell'], *obs_dict['robot_obs']])
+        return obs_dict
+
 
 class FlatObsWrapper(gym.core.ObservationWrapper):
     """
