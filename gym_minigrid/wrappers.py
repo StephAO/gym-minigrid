@@ -220,7 +220,7 @@ class RGBImgPartialObsWrapper(gym.core.ObservationWrapper):
 
 class FullyObsWrapper(gym.core.ObservationWrapper):
     """
-    Fully observable gridworld using a compact grid encoding
+    Fully observable gridworld using a compact grid encoding. Target must be inferred from natural language "mission"
     """
 
     def __init__(self, env):
@@ -249,68 +249,30 @@ class FullyObsWrapper(gym.core.ObservationWrapper):
             'robot_obs': np.array([*agent_dir_one_hot])
         }
 
-class EasyModeWrapper(gym.core.ObservationWrapper):
+class EasyModeWrapper(FullyObsWrapper):
     """
-    Fully observable gridworld using a compact grid encoding
+    Fully observable gridworld that returns current position and target position as (x, y) tuples.
     """
-
-    def __init__(self, env):
-        super().__init__(env)
-
-        self.observation_space.spaces["image"] = spaces.Box(
-            low=0,
-            high=255,
-            shape=(self.env.width, self.env.height, 3),  # number of cells
-            dtype='uint8'
-        )
-
     def observation(self, obs):
         env = self.unwrapped
-        full_grid = env.grid.encode()
-        full_grid[env.agent_pos[0]][env.agent_pos[1]] = np.array([
-            OBJECT_TO_IDX['agent'],
-            COLOR_TO_IDX['red'],
-            env.agent_dir
-        ])
         agent_dir_one_hot = np.zeros(4)
         agent_dir_one_hot[env.agent_dir] = 1.
         return {
-            'mission': "go to goal", #obs['mission'],
-            'visual_obs': obs['goal'],
+            'mission': "go to goal",
+            'visual_obs': obs['target_cell'],
             'robot_obs': np.array([*env.agent_pos, *agent_dir_one_hot])
         }
 
-class NoLanguageWrapper(gym.core.ObservationWrapper):
+class NoLanguageWrapper(FullyObsWrapper):
     """
-    Fully observable gridworld using a compact grid encoding
+    Fully observable gridworld using a compact grid encoding. Target is additionally provided as an (x, y) tuple so that
+    no language is needed to solve the puzzle.
     """
-
-    def __init__(self, env):
-        super().__init__(env)
-
-        self.observation_space.spaces["image"] = spaces.Box(
-            low=0,
-            high=255,
-            shape=(self.env.width, self.env.height, 3),  # number of cells
-            dtype='uint8'
-        )
-
     def observation(self, obs):
-        env = self.unwrapped
-        full_grid = env.grid.encode()
-        full_grid[env.agent_pos[0]][env.agent_pos[1]] = np.array([
-            OBJECT_TO_IDX['agent'],
-            COLOR_TO_IDX['red'],
-            env.agent_dir
-        ])
-        agent_dir_one_hot = np.zeros(4)
-        agent_dir_one_hot[env.agent_dir] = 1.
-        return {
-            'mission': "go to goal", #obs['mission'],
-            'image': full_grid,
-            # 'robot_obs': obs['goal']
-            'robot_obs': np.array([*obs['goal'], *agent_dir_one_hot])
-        }
+        obs_dict = super().observation(obs)
+        obs_dict['mission'] = "go to goal"
+        obs_dict['robot_obs'] = np.array([*obs['target_cell'], *obs_dict['robot_obs']])
+        return obs_dict
 
 
 class FlatObsWrapper(gym.core.ObservationWrapper):

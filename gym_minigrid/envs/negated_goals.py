@@ -16,7 +16,7 @@ class EmptyEnv(MiniGridEnv):
         split = 0.8,
         mode = "TRAIN",
         types = ('key', 'ball', 'box'),
-        colors = ('red', 'green', 'blue', 'purple', 'yellow', 'grey', 'black', 'cyan', 'brown', 'orange')
+        colors = ('red', 'green', 'blue', 'purple', 'yellow', 'grey', 'white', 'cyan', 'brown', 'orange')
     ):
         self.agent_start_pos = agent_start_pos
         self.agent_start_dir = agent_start_dir
