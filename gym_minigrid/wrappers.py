@@ -246,7 +246,8 @@ class FullyObsWrapper(gym.core.ObservationWrapper):
         return {
             'mission': obs['mission'],
             'image': full_grid,
-            'robot_obs': np.array([*agent_dir_one_hot])
+            'robot_obs': np.array([*agent_dir_one_hot]),
+            'target_cell': obs['target_cell'],
         }
 
 class EasyModeWrapper(FullyObsWrapper):
@@ -260,7 +261,8 @@ class EasyModeWrapper(FullyObsWrapper):
         return {
             'mission': "go to goal",
             'visual_obs': obs['target_cell'],
-            'robot_obs': np.array([*env.agent_pos, *agent_dir_one_hot])
+            'robot_obs': np.array([*env.agent_pos, *agent_dir_one_hot]),
+            'target_cell': obs['target_cell'],
         }
 
 class NoLanguageWrapper(FullyObsWrapper):
