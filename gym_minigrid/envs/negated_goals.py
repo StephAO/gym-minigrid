@@ -15,6 +15,7 @@ class EmptyEnv(MiniGridEnv):
         num_distractors=1,
         split = 0.8,
         mode = "TRAIN",
+        mission_type = "EITHER",
         types = ('key', 'ball', 'box'),
         colors = ('red', 'green', 'blue', 'purple', 'yellow', 'grey', 'white', 'cyan', 'brown', 'orange')
     ):
@@ -44,7 +45,7 @@ class EmptyEnv(MiniGridEnv):
         self.vocabulary = None
 
         self.split = split
-        self.set_mode(mode)
+        self.set_mode(mode, mission_type)
 
         super().__init__(
             grid_size=size,
@@ -67,11 +68,14 @@ class EmptyEnv(MiniGridEnv):
                     self.vocabulary.add(word)
         return self.vocabulary
 
-    def set_mode(self, mode):
+    def set_mode(self, mode, mission_type):
         if mode not in ["TRAIN", "EVAL"]:
             raise ValueError("Unexpected value for mode")
+        if mission_type not in ["DIRECT", "NEGATED", "EITHER"]:
+            raise ValueError("Unexpected value for mission_type")
 
         self.mode = mode
+        self.mission_type = mission_type
 
     def compute_indices(self, length):
         if self.mode == "TRAIN":
@@ -148,9 +152,9 @@ class EmptyEnv(MiniGridEnv):
         # Randomize the player start position and orientation
         self.place_agent()
 
-        if self._rand_bool():
+        if (self.mission_type == "EITHER" and self._rand_bool()) or self.mission_type == "DIRECT":
             self.mission = self.direct_mission()
-        else:
+        else: # mission_type == "NEGATED" or rand bool returned False
             self.mission = self.negated_mission()
 
     def step(self, action):
@@ -162,7 +166,7 @@ class EmptyEnv(MiniGridEnv):
                 reward = self._reward()
                 done = True
             else:
-                reward = -0.1
+                reward = -1
                 done = True
 
         return obs, reward, done, info
