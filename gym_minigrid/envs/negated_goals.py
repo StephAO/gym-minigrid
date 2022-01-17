@@ -49,7 +49,7 @@ class EmptyEnv(MiniGridEnv):
 
         super().__init__(
             grid_size=size,
-            max_steps=4*size*size,
+            max_steps=3*size*size,
             # Set this to True for maximum speed
             see_through_walls=True
         )
@@ -163,7 +163,7 @@ class EmptyEnv(MiniGridEnv):
         if self.carrying:
             if self.carrying.color == self.target_color and \
                     self.carrying.type == self.target_type:
-                reward = self._reward()
+                reward = 1
                 done = True
             else:
                 reward = -1
