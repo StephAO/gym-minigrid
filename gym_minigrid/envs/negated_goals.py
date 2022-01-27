@@ -197,10 +197,10 @@ class NegatedSimple(EmptyEnv):
     def __init__(self, **kwargs):
         super().__init__(size=8, **kwargs)
 
-# register(
-#     id='MiniGrid-Negated-Simple-v0',
-#     entry_point='gym_minigrid.envs:NegatedSimple'
-# )
+register(
+    id='MiniGrid-Negated-Simple-v0',
+    entry_point='gym_minigrid.envs:NegatedSimple'
+)
 
 if __name__ == "__main__":
     base_templates = [

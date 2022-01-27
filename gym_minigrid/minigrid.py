@@ -56,7 +56,7 @@ OBJECT_TO_IDX = {
     'lava'          : 9,
     'agent'         : 10,
     'square'        : 11,
-    'rectangle'     : 12,
+    'crate'         : 12,
     'circle'        : 13
 }
 
@@ -356,7 +356,6 @@ class Box(WorldObj):
 class Square(WorldObj):
     def __init__(self, color):
         super(Square, self).__init__('square', color)
-        self.contains = contains
 
     def can_pickup(self):
         return True
@@ -370,7 +369,6 @@ class Square(WorldObj):
 class Crate(WorldObj):
     def __init__(self, color):
         super(Crate, self).__init__('crate', color)
-        self.contains = contains
 
     def can_pickup(self):
         return True
