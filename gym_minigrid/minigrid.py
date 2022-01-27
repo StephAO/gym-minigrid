@@ -55,6 +55,9 @@ OBJECT_TO_IDX = {
     'goal'          : 8,
     'lava'          : 9,
     'agent'         : 10,
+    'square'        : 11,
+    'rectangle'     : 12,
+    'circle'        : 13
 }
 
 IDX_TO_OBJECT = dict(zip(OBJECT_TO_IDX.values(), OBJECT_TO_IDX.keys()))
@@ -150,6 +153,12 @@ class WorldObj:
             v = Goal()
         elif obj_type == 'lava':
             v = Lava()
+        elif obj_type == 'circle':
+            v = Circle()
+        elif obj_type == 'square':
+            v = Square()
+        elif obj_type == 'crate':
+            v = Crate()
         else:
             assert False, "unknown object type in decode '%s'" % obj_type
 
@@ -311,6 +320,16 @@ class Ball(WorldObj):
     def render(self, img):
         fill_coords(img, point_in_circle(0.5, 0.5, 0.31), COLORS[self.color])
 
+class Circle(WorldObj):
+    def __init__(self, color='blue'):
+        super(Circle, self).__init__('circle', color)
+
+    def can_pickup(self):
+        return True
+
+    def render(self, img):
+        fill_coords(img, point_in_circle(0.5, 0.5, 0.31), COLORS[self.color])
+
 class Box(WorldObj):
     def __init__(self, color, contains=None):
         super(Box, self).__init__('box', color)
@@ -333,6 +352,34 @@ class Box(WorldObj):
         # Replace the box by its contents
         env.grid.set(*pos, self.contains)
         return True
+
+class Square(WorldObj):
+    def __init__(self, color):
+        super(Square, self).__init__('square', color)
+        self.contains = contains
+
+    def can_pickup(self):
+        return True
+
+    def render(self, img):
+        c = COLORS[self.color]
+        # Outline
+        fill_coords(img, point_in_rect(0.12, 0.88, 0.12, 0.88), c)
+
+
+class Crate(WorldObj):
+    def __init__(self, color):
+        super(Crate, self).__init__('crate', color)
+        self.contains = contains
+
+    def can_pickup(self):
+        return True
+
+    def render(self, img):
+        c = COLORS[self.color]
+        # Outline
+        fill_coords(img, point_in_rect(0.1, 0.9, 0.3, 0.7), c)
+
 
 class Grid:
     """
