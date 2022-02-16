@@ -169,7 +169,7 @@ class OracleAgent:
             assert sum(rewards) > 0
             assert done
 
-            demos.append( (mission, obss, actions, rewards, self.env.get_oracle_goal()) )
+            demos.append( (mission, obss, actions, rewards, self.env.target_cell, self.env.obj_descs) )
 
         if self.visualize:
             self.window.close()

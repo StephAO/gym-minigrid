@@ -36,12 +36,13 @@ class EmptyEnv(MiniGridEnv):
         }
 
         self.base_templates = [
-            "The target is <not><desc>."
-            "The target is object that is <not><desc>.",
-            "Pick up the <not><desc><obj>.",
-            "Pick up the object that is <not><desc>.",
-            "<not><desc>.",
-            "The <desc><obj> is <not>the target."
+            "The target is <not><the><desc>.",
+            "The target is the object that is <not><the><desc>.",
+            "The <desc><obj> is <not>the target.",
+            "The object to pick up is <not><the><desc>.",
+            "The object that is <not><the><desc> must be picked up.",
+            "Pick up the object that is <not><the><desc>.",
+            "<not><the><desc>.",
             # "Navigate to the object that is <not><desc>",
             # "Find the object that is <not><desc>",
             # "The object that is <not><desc> is the goal",
@@ -105,13 +106,12 @@ class EmptyEnv(MiniGridEnv):
         distractor_type_opts = self.types[:type_idx] + self.types[type_idx + 1:]
         distractor_color_opts = self.colors[:color_idx] + self.colors[color_idx + 1:]
 
-        for d in range(self.num_distractors):
-            obj_type = self._rand_elem(distractor_type_opts)
-            obj_color = self._rand_elem(distractor_color_opts)
+        dist_color = self._rand_elem(distractor_color_opts)
+        dist_type = self._rand_elem(distractor_type_opts)
+        dist = self.type_dict[dist_type](dist_color)
+        self.place_obj(dist)
 
-            obj = self.type_dict[obj_type](obj_color)
-
-            self.place_obj(obj)
+        self.obj_descs = f' {self.target_color} {self.target_type} {dist_color} {dist_type}'
 
         template = self._rand_elem(self.base_templates)
         mission = template.replace("<not>", "")
@@ -138,16 +138,16 @@ class EmptyEnv(MiniGridEnv):
         self.target_color = self.colors[color_idx]
         target_obj = self.type_dict[self.target_type](self.target_color)
         self.target_cell = self.place_obj(target_obj)
-
+        
         distractor_type_opts = self.types[:type_idx] + self.types[type_idx + 1:]
         distractor_color_opts = self.colors[:color_idx] + self.colors[color_idx + 1:]
 
         dist_color = self._rand_elem(distractor_color_opts)
+        dist_type = self._rand_elem(distractor_type_opts)
+        dist = self.type_dict[dist_type](dist_color)
+        self.place_obj(dist)
 
-        for d in range(self.num_distractors):
-            obj_type = self._rand_elem(distractor_type_opts)
-            obj = self.type_dict[obj_type](dist_color)
-            self.place_obj(obj)
+        self.obj_descs = f' {self.target_color} {self.target_type} {dist_color} {dist_type}'
 
         template = self._rand_elem(self.base_templates)
         mission = template.replace("<not>", "not ")
