@@ -1,5 +1,6 @@
 from numpy import mat
 from gym_minigrid.minigrid import *
+from gym_minigrid.objects import WorldObj, OBJECT_TO_IDX, COLOR_TO_IDX
 from gym_minigrid.register import register
 
 class EmptyEnv(MiniGridEnv):
@@ -13,27 +14,27 @@ class EmptyEnv(MiniGridEnv):
         agent_start_pos=(1,1),
         agent_start_dir=0,
         num_distractors=1,
-        split = 1.0,
         mode = "TRAIN",
         mission_type = "EITHER",
-        types = ('key', 'ball', 'box', 'square', 'crate', 'circle'),
-        colors = ('red', 'green', 'blue', 'purple', 'yellow', 'grey', 'white', 'cyan', 'brown', 'orange')
+        training_type = '1set', # One of: 1set, 2set, all
+        use_color=True,
+        types =
+        {'things': ['key', 'box', 'ball', 'tree', 'cup', 'tool', 'building', 'crate', 'chair', 'flower'],
+         'shapes': ['square', 'circle', 'oval', 'line', 'rectangle', 'diamond', 'ring', 'cross', 'star', 'arrow']},
+        colors = ['red', 'green', 'blue', 'purple', 'yellow', 'grey', 'white', 'cyan', 'brown', 'orange']
     ):
         self.agent_start_pos = agent_start_pos
         self.agent_start_dir = agent_start_dir
         self.num_distractors = num_distractors
 
+        self.training_type = training_type
         self.types = types
-        self.colors = colors
+        self.use_color = use_color
+        if self.use_color:
+            self.colors = colors
 
-        self.type_dict = {
-            'key': Key,
-            'ball': Ball,
-            'box': Box,
-            'crate': Crate,
-            'square': Square,
-            'circle': Circle
-        }
+        self.set_mode(mode, mission_type)
+        self.setup_splits()
 
         self.base_templates = [
             "The target is <not><the><desc>.",
@@ -50,9 +51,6 @@ class EmptyEnv(MiniGridEnv):
         # Thought to better resemble cloze task: "The goal is not blue"
 
         self.vocabulary = None
-
-        self.split = split
-        self.set_mode(mode, mission_type)
 
         super().__init__(
             grid_size=size,
@@ -78,44 +76,79 @@ class EmptyEnv(MiniGridEnv):
     def set_mode(self, mode, mission_type):
         if mode not in ["TRAIN", "EVAL"]:
             raise ValueError("Unexpected value for mode")
-        if mission_type not in ["DIRECT", "NEGATED", "EITHER"]:
+        if mission_type not in ["DIRECT", "NEGATED", "EITHER", "TEST"]:
             raise ValueError("Unexpected value for mission_type")
-
         self.mode = mode
         self.mission_type = mission_type
 
-    def compute_indices(self, length):
-        if self.mode == "TRAIN":
-            return 0, math.floor(self.split * length)
-        else:
-            return math.floor(self.split * length), length
+    def setup_splits(self):
+        half_len = len(self.types['shapes']) // 2
+        if self.training_type == '1set':
+            target_types_set_1 = self.types['shapes'][:half_len]
+            target_types_set_2 = self.types['shapes'][half_len:]
+            distra_types = self.types['shapes']
+        elif self.training_type == '2set':
+            target_types_set_1 = (self.types['shapes'][:half_len], self.types['thing'][:half_len])
+            target_types_set_2 = (self.types['shapes'][half_len:], self.types['thing'][half_len:])
+            distra_types = (self.types['shapes'], self.types['thing'])
+        elif self.training_type == 'all':
+            target_types_set_1 = self.types['shapes'][:half_len] + self.types['thing'][:half_len]
+            target_types_set_2 = self.types['shapes'][half_len:] + self.types['thing'][half_len:]
+            distra_types = self.types['shapes'] + self.types['thing']
+        self.distra_types = distra_types
 
-    def direct_mission(self):
+        if self.use_color:
+            half_len = len(self.colors) // 2
+            target_color_set_1 = self.colors[:half_len]
+            target_color_set_2 = self.colors[half_len:]
+            self.distr_colors = self.colors
+
+        if self.mode == 'TRAIN':
+            self.dir_target_types = target_types_set_1
+            self.neg_target_types = target_types_set_2
+            if self.use_color:
+                self.dir_target_colors = target_color_set_1
+                self.neg_target_colors = target_color_set_2
+        elif self.mode == 'EVAL':
+            self.dir_target_types = target_types_set_2
+            self.neg_target_types = target_types_set_1
+            if self.use_color:
+                self.dir_target_colors = target_color_set_2
+                self.neg_target_colors = target_color_set_1
+
+    def new_mission(self, negated: bool):
+        target_types = self.neg_target_types if negated else self.dir_target_types
+        target_colors = self.neg_target_colors if negated else self.dir_target_colors
+        distra_types = self.distra_types
+        distra_colors = self.distr_colors
+        
+        if self.training_type == '2set':
+            set_idx = self._rand_int(0, 2)
+            target_types = target_types[set_idx]
+            distra_types = distra_types[set_idx]
+        
         # 1. Choose a target type and color
-        # 2. Create N distraction objects that cannot share the same tuple
-        type_idx = self._rand_int(*self.compute_indices(len(self.types)))
-        # Updated the random selection to limit the indices accoring to the mode
-        # Train: 0 -> len * split(exclusive)
-        # Eval: len * split -> len(exclusive)
-        color_idx = self._rand_int(*self.compute_indices(len(self.colors)))
-        self.target_type = self.types[type_idx]
-        self.target_color = self.colors[color_idx]
-        target_obj = self.type_dict[self.target_type](self.target_color)
+        self.target_type = self._rand_elem(target_types)
+        self.target_color = self._rand_elem(target_colors)
+        target_obj = WorldObj.decode(OBJECT_TO_IDX[self.target_type], COLOR_TO_IDX[self.target_color], 0)
         self.target_cell = self.place_obj(target_obj)
 
-        distractor_type_opts = self.types[:type_idx] + self.types[type_idx + 1:]
-        distractor_color_opts = self.colors[:color_idx] + self.colors[color_idx + 1:]
-
+        # 2. Create a distraction objects that cannot share the same tuple
+        type_idx = distra_types.index(self.target_type)
+        distractor_type_opts = distra_types[:type_idx] + distra_types[type_idx + 1:]
+        color_idx = distra_colors.index(self.target_color)
+        distractor_color_opts = distra_colors[:color_idx] + distra_colors[color_idx + 1:]
         dist_color = self._rand_elem(distractor_color_opts)
         dist_type = self._rand_elem(distractor_type_opts)
-        dist = self.type_dict[dist_type](dist_color)
+        dist = WorldObj.decode(OBJECT_TO_IDX[dist_type], COLOR_TO_IDX[dist_color], 0)
         self.place_obj(dist)
 
+        # Generate with necessary language output
         self.obj_descs = f' {self.target_color} {self.target_type} {dist_color} {dist_type}'
 
         template = self._rand_elem(self.base_templates)
         mission = template.replace("<not>", "")
-        if False: # self._rand_bool(): # use color
+        if self._rand_bool(): # use color
             mission = mission.replace("<desc>", self.target_color)
             mission = mission.replace("<obj>", " object")
             mission = mission.replace("<the>", "")
@@ -125,33 +158,22 @@ class EmptyEnv(MiniGridEnv):
             mission = mission.replace("<obj>", "")
         return mission.capitalize()
 
-    def negated_mission(self):
-        # 1. Choose a target type and color
-        # 2. Choose a negated description
-        # 3. Create N distraction objects that share the negated description
-        type_idx = self._rand_int(0, len(self.types))
-        # Updated the random selection to limit the indices accoring to the mode
-        # Train: 0 -> len * split(exclusive)
-        # Eval: len * split -> len(exclusive)
-        color_idx = self._rand_int(*self.compute_indices(len(self.colors)))
-        self.target_type = self.types[type_idx]
-        self.target_color = self.colors[color_idx]
-        target_obj = self.type_dict[self.target_type](self.target_color)
-        self.target_cell = self.place_obj(target_obj)
-        
-        distractor_type_opts = self.types[:type_idx] + self.types[type_idx + 1:]
-        distractor_color_opts = self.colors[:color_idx] + self.colors[color_idx + 1:]
+    def object_test(self):
+        for i, type in enumerate(self.types):
+            if i == 0:
+                obj = WorldObj.decode(OBJECT_TO_IDX[type], COLOR_TO_IDX['green'], 0)
+                self.target_type = type
+                self.target_color = 'green'
+                self.target_cell = self.place_obj(obj)
+            else:
+                obj = WorldObj.decode(OBJECT_TO_IDX[type], COLOR_TO_IDX['red'], 0)
+                self.place_obj(obj)
 
-        dist_color = self._rand_elem(distractor_color_opts)
-        dist_type = self._rand_elem(distractor_type_opts)
-        dist = self.type_dict[dist_type](dist_color)
-        self.place_obj(dist)
-
-        self.obj_descs = f' {self.target_color} {self.target_type} {dist_color} {dist_type}'
+        self.obj_descs = f' {self.target_color} {self.target_type} red square'
 
         template = self._rand_elem(self.base_templates)
         mission = template.replace("<not>", "not ")
-        if False: #self._rand_bool():  # use color
+        if False:  # self._rand_bool():  # use color
             mission = mission.replace("<desc>", self.target_color)
             mission = mission.replace("<obj>", " object")
             mission = mission.replace("<the>", "")
@@ -174,10 +196,11 @@ class EmptyEnv(MiniGridEnv):
         # Randomize the player start position and orientation
         self.place_agent()
 
-        if (self.mission_type == "EITHER" and self._rand_bool()) or self.mission_type == "DIRECT":
-            self.mission = self.direct_mission()
-        else: # mission_type == "NEGATED" or rand bool returned False
-            self.mission = self.negated_mission()
+        if self.mission_type == "TEST":
+            self.mission = self.object_test()
+        else:
+            negated = (self.mission_type == "EITHER" and self._rand_bool()) or self.mission_type == "NEGATED"
+            self.mission = self.new_mission(negated)
 
     def step(self, action):
         obs, reward, done, info = MiniGridEnv.step(self, action)

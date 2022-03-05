@@ -15,14 +15,19 @@ VEC_TO_DIR = {
 }
 
 class OracleAgent:
-    def __init__(self, env, visualize=True, seed=-1):
+    def __init__(self, env, visualize=True, seed=-1, agent_view=True):
         self.env = env
         self.visualize = visualize
         self.seed = seed
+        self.agent_view = agent_view
+        if self.visualize:
+            self.window = Window('gym_minigrid')
 
-    def redraw(self, img):
-        # if not args.agent_view:
-        img = self.env.render('rgb_array', tile_size=32)
+    def redraw(self, obs):
+        if self.agent_view:
+            img = obs['image']
+        else:
+            img = self.env.render('rgb_array', tile_size=32)
         self.window.show_img(img)
 
     def reset(self):
@@ -32,7 +37,7 @@ class OracleAgent:
         obs = self.env.reset()
 
         if hasattr(self.env, 'mission') and self.visualize:
-            print('Mission: %s' % self.env.mission)
+            # print('Mission: %s' % self.env.mission)
             self.window.set_caption(self.env.mission)
         if self.visualize:
             self.redraw(obs)
@@ -140,13 +145,13 @@ class OracleAgent:
         return None, None, previous_pos
 
     def generate_demos(self, num_demos=1):
-        if self.visualize:
-            self.window = Window('gym_minigrid')
+        # if self.visualize:
+        #     self.window = Window('gym_minigrid')
         demos = []
         for demo in range(num_demos):
             obss, rewards, actions = [], [], []
             obs, target = self.reset()
-            mission = obs["mission"]
+            mission = 'yes mam' #obs["mission"]
             if self.visualize:
                 # Blocking event loop
                 self.window.show(block=False)
@@ -159,7 +164,7 @@ class OracleAgent:
                 actions.append(action)
                 rewards.append(reward)
                 if self.visualize:
-                    time.sleep(0.5)
+                    time.sleep(2)
                 if done:
                     break
 
@@ -183,7 +188,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--env",
         help="gym environment to load",
-        default='MiniGrid-MultiRoom-N6-v0'
+        default='MiniGrid-Negated-Simple-v0'
     )
     parser.add_argument(
         "--seed",
@@ -192,13 +197,13 @@ if __name__ == "__main__":
         default=-1
     )
     parser.add_argument(
-        "--tile_size",
+        "--tile-size",
         type=int,
         help="size at which to render tiles",
         default=32
     )
     parser.add_argument(
-        '--agent_view',
+        '--agent-view',
         default=False,
         help="draw the agent sees (partially observable view)",
         action='store_true'
@@ -207,31 +212,41 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     env = gym.make(args.env)
-    env = FullyObsWrapper(env)
+    #
 
     if args.agent_view:
-        env = RGBImgPartialObsWrapper(env)
-        env = ImgObsWrapper(env)
+        print('yes')
+        env = RGBImgPartialObsWrapper(env, tile_size=16)
+        # env = ImgObsWrapper(env)
+    else:
+        env = FullyObsWrapper(env)
 
-    window = Window('gym_minigrid - ' + args.env)
+    env.reset()
+
+    env.set_mode('TRAIN', 'TEST')
+    oracle = OracleAgent(env, visualize=True, agent_view=args.agent_view)
+    oracle.generate_demos(5)
+
+    # window = Window('gym_minigrid - ' + args.env)
     # window.reg_key_handler(key_handler)
-    obs, target = reset()
+    # obs, target = oracle.reset()
     # Blocking event loop
-    window.show(block=False)
-
-    while True:
-        time.sleep(1)
-        for action in get_sequence(env, target):
-            print("ACTION", action)
-            obs, reward, done, info = step(action)
-            time.sleep(1)
-            if done:
-                print('done!')
-                break
+    # window.show(block=False)
 
 
-        # print(obs['image'][:, :, 0])
-        # print(obs['image'][:, :, 1])
-        # print(obs['image'][:, :, 2])
-        # time.sleep(10)
-        obs, target = reset()
+    # while True:
+    #     time.sleep(1)
+    #     for action in get_sequence(env, target):
+    #         print("ACTION", action)
+    #         obs, reward, done, info = step(action)
+    #         time.sleep(1)
+    #         if done:
+    #             print('done!')
+    #             break
+    #
+    #
+    #     # print(obs['image'][:, :, 0])
+    #     # print(obs['image'][:, :, 1])
+    #     # print(obs['image'][:, :, 2])
+    #     # time.sleep(10)
+    #     obs, target = reset()

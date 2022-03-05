@@ -76,6 +76,11 @@ def point_in_circle(cx, cy, r):
         return (x-cx)*(x-cx) + (y-cy)*(y-cy) <= r * r
     return fn
 
+def point_in_oval(cx, cy, rx, ry):
+    def fn(x, y):
+        return (x-cx)*(x-cx) * ry * ry + (y-cy)*(y-cy) * rx * rx <= rx * rx * ry * ry
+    return fn
+
 def point_in_rect(xmin, xmax, ymin, ymax):
     def fn(x, y):
         return x >= xmin and x <= xmax and y >= ymin and y <= ymax
