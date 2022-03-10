@@ -151,7 +151,7 @@ class OracleAgent:
         for demo in range(num_demos):
             obss, rewards, actions = [], [], []
             obs, target = self.reset()
-            mission = 'yes mam' #obs["mission"]
+            mission = obs["mission"]
             if self.visualize:
                 # Blocking event loop
                 self.window.show(block=False)
@@ -174,7 +174,7 @@ class OracleAgent:
             assert sum(rewards) > 0
             assert done
 
-            demos.append( (mission, obss, actions, rewards, self.env.target_cell, self.env.obj_descs) )
+            demos.append( (mission, obss, actions, rewards, self.env.target_cell, self.env.label) )
 
         if self.visualize:
             self.window.close()

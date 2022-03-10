@@ -16,7 +16,7 @@ class EmptyEnv(MiniGridEnv):
         num_distractors=1,
         mode = "TRAIN",
         mission_type = "EITHER",
-        training_type = '1set', # One of: 1set, 2set, all
+        training_type = 'all', # One of: 1set, 2set, all
         use_color=True,
         types =
         {'things': ['key', 'box', 'ball', 'tree', 'cup', 'tool', 'building', 'crate', 'chair', 'flower'],
@@ -37,13 +37,15 @@ class EmptyEnv(MiniGridEnv):
         self.setup_splits()
 
         self.base_templates = [
-            "The target is <not><the><desc>.",
-            "The target is the object that is <not><the><desc>.",
-            "The <desc><obj> is <not>the target.",
-            "The object to pick up is <not><the><desc>.",
-            "The object that is <not><the><desc> must be picked up.",
-            "Pick up the object that is <not><the><desc>.",
-            "<not><the><desc>.",
+            "The target is <not><the><desc>. The target is the<mask>.",
+            # "The target is the object that is <not><the><desc>.",
+            # "The <desc><obj> is <not>the target.",
+            # "The object to pick up is <not><the><desc>.",
+            # "The object that is <not><the><desc> must be picked up.",
+            # "Pick up the object that is <not><the><desc>.",
+            # Get the object that is <not><the><desc>.
+            #
+            # "<not><the><desc>.",
             # "Navigate to the object that is <not><desc>",
             # "Find the object that is <not><desc>",
             # "The object that is <not><desc> is the goal",
@@ -88,13 +90,13 @@ class EmptyEnv(MiniGridEnv):
             target_types_set_2 = self.types['shapes'][half_len:]
             distra_types = self.types['shapes']
         elif self.training_type == '2set':
-            target_types_set_1 = (self.types['shapes'][:half_len], self.types['thing'][:half_len])
-            target_types_set_2 = (self.types['shapes'][half_len:], self.types['thing'][half_len:])
-            distra_types = (self.types['shapes'], self.types['thing'])
+            target_types_set_1 = (self.types['shapes'][:half_len], self.types['things'][:half_len])
+            target_types_set_2 = (self.types['shapes'][half_len:], self.types['things'][half_len:])
+            distra_types = (self.types['shapes'], self.types['things'])
         elif self.training_type == 'all':
-            target_types_set_1 = self.types['shapes'][:half_len] + self.types['thing'][:half_len]
-            target_types_set_2 = self.types['shapes'][half_len:] + self.types['thing'][half_len:]
-            distra_types = self.types['shapes'] + self.types['thing']
+            target_types_set_1 = self.types['shapes'][:half_len] + self.types['things'][:half_len]
+            target_types_set_2 = self.types['shapes'][half_len:] + self.types['things'][half_len:]
+            distra_types = self.types['shapes'] + self.types['things']
         self.distra_types = distra_types
 
         if self.use_color:
@@ -144,7 +146,7 @@ class EmptyEnv(MiniGridEnv):
         self.place_obj(dist)
 
         # Generate with necessary language output
-        self.obj_descs = f' {self.target_color} {self.target_type} {dist_color} {dist_type}'
+        
 
         template = self._rand_elem(self.base_templates)
         mission = template.replace("<not>", "")
@@ -156,6 +158,9 @@ class EmptyEnv(MiniGridEnv):
             mission = mission.replace("<the>", "the ")
             mission = mission.replace("<desc>", self.target_type)
             mission = mission.replace("<obj>", "")
+        target_desc = f' {self.target_color} {self.target_type}'
+        self.label = mission.replace("<mask>", target_desc)
+            
         return mission.capitalize()
 
     def object_test(self):
@@ -169,7 +174,7 @@ class EmptyEnv(MiniGridEnv):
                 obj = WorldObj.decode(OBJECT_TO_IDX[type], COLOR_TO_IDX['red'], 0)
                 self.place_obj(obj)
 
-        self.obj_descs = f' {self.target_color} {self.target_type} red square'
+        self.label = f' {self.target_color} {self.target_type} red square'
 
         template = self._rand_elem(self.base_templates)
         mission = template.replace("<not>", "not ")

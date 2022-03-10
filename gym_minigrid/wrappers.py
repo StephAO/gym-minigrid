@@ -248,7 +248,7 @@ class FullyObsWrapper(gym.core.ObservationWrapper):
             'image': full_grid,
             'robot_obs': np.array([*agent_dir_one_hot]),
             'target_cell': obs['target_cell'],
-            'obj_descs': obs['obj_descs'],
+            'label': obs['label'],
         }
 
 class EasyModeWrapper(FullyObsWrapper):

@@ -919,7 +919,7 @@ class MiniGridEnv(gym.Env):
             'direction': self.agent_dir,
             'mission': self.mission,
             'target_cell': self.target_cell,
-            'obj_descs': self.obj_descs
+            'label': self.label
         }
 
         return obs
