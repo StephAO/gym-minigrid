@@ -146,22 +146,22 @@ class EmptyEnv(MiniGridEnv):
         self.place_obj(dist)
 
         # Generate with necessary language output
-        
-
         template = self._rand_elem(self.base_templates)
-        mission = template.replace("<not>", "")
+        mission = template.replace("<not>", "not " if negated else "")
         if self._rand_bool(): # use color
-            mission = mission.replace("<desc>", self.target_color)
+            color = dist_color if negated else self.target_color
+            mission = mission.replace("<desc>", color)
             mission = mission.replace("<obj>", " object")
             mission = mission.replace("<the>", "")
         else: # use object
+            obj_type = dist_type if negated else self.target_type
             mission = mission.replace("<the>", "the ")
-            mission = mission.replace("<desc>", self.target_type)
+            mission = mission.replace("<desc>", obj_type)
             mission = mission.replace("<obj>", "")
         target_desc = f' {self.target_color} {self.target_type}'
         self.label = mission.replace("<mask>", target_desc)
             
-        return mission.capitalize()
+        return mission
 
     def object_test(self):
         for i, type in enumerate(self.types):
@@ -186,7 +186,7 @@ class EmptyEnv(MiniGridEnv):
             mission = mission.replace("<the>", "the ")
             mission = mission.replace("<desc>", self.target_type)
             mission = mission.replace("<obj>", "")
-        return mission.capitalize()
+        return mission
 
 
     def _gen_grid(self, width, height):
