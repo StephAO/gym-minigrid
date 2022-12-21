@@ -6,7 +6,7 @@ import gymnasium as gym
 
 from minigrid.minigrid_env import MiniGridEnv
 from minigrid.utils.window import Window
-from minigrid.wrappers import ImgObsWrapper, RGBImgPartialObsWrapper
+from minigrid.wrappers import ImgObsWrapper, RGBImgPartialObsWrapper, FullyObsWrapper
 
 
 class ManualControl:

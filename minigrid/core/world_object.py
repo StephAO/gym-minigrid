@@ -137,8 +137,6 @@ class WorldObj:
         elif obj_type == 'flower':
             v = Flower(color)
 
-
-
         elif obj_type == 'crate':
             v = Crate(color)
         else:

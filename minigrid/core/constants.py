@@ -28,10 +28,10 @@ COLOR_TO_IDX = {
     'purple': 3,
     'yellow': 4,
     'grey'  : 5,
-    'white' :  6,
-    'cyan' : 7,
-    'brown'  : 8,
-    'orange' : 9
+    'white' : 6,
+    'cyan'  : 7,
+    'brown' : 8,
+    'orange': 9
 }
 
 IDX_TO_COLOR = dict(zip(COLOR_TO_IDX.values(), COLOR_TO_IDX.keys()))
@@ -65,12 +65,15 @@ OBJECT_TO_IDX = {
     'box'           : 23,
     'tree'          : 24,
     'cup'           : 25,
-    'tool'        : 26,
-    'building'         : 27,
+    'tool'          : 26,
+    'building'      : 27,
     'crate'         : 28,
     'chair'         : 29,
     'flower'        : 30
 }
+
+OBJECT_NAMES = sorted(list(OBJECT_TO_IDX.keys()))
+NON_BASE_OBJ_NAMES = [o for o in OBJECT_NAMES if o not in ['unseen','empty','wall','floor','door','goal','lava','agent']]
 
 # TODO : shapes: 'line', 'rectangle', 'diamond', 'cross', 'star'
 # TODO : object: 'tool', 'tree',  'flower', 'cup', '

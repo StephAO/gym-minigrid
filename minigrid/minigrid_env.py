@@ -739,7 +739,6 @@ class MiniGridEnv(gym.Env):
             return self.get_full_render(highlight, tile_size)
 
     def render(self):
-
         img = self.get_frame(self.highlight, self.tile_size, self.agent_pov)
 
         if self.render_mode == "human":

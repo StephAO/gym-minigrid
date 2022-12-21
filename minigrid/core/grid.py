@@ -174,7 +174,7 @@ class Grid:
             obj.render(img)
 
         # Overlay the agent on top
-        if agent_dir is not None:
+        if agent_dir is not None and False:
             tri_fn = point_in_triangle(
                 (0.12, 0.19),
                 (0.87, 0.50),

@@ -1072,5 +1072,10 @@ def register_minigrid_envs():
         entry_point="minigrid.envs.babyai:BossLevelNoUnlock",
     )
 
+    register(
+        id="ContrastiveDataset-v0",
+        entry_point="minigrid.envs:ContrastiveDataset",
+    )
+
 
 __version__ = "2.1.0"
