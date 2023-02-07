@@ -12,7 +12,7 @@ from minigrid.core.world_object import WorldObj
 from minigrid.minigrid_env import MiniGridEnv
 
 
-class ContrastiveDataset(MiniGridEnv):
+class ContrastiveTrajectoryDataset(MiniGridEnv):
     """
     Environment in which the agent is instructed to go to a given object
     named using an English text string
@@ -70,7 +70,6 @@ class ContrastiveDataset(MiniGridEnv):
         # Types and colors of objects we can generate
         obj_color, obj_type = self.splits[self.curr_split][self.curr_comp_idx]
         self.curr_comp_idx = (self.curr_comp_idx + 1) % len(self.splits[self.curr_split])
-
         obj = WorldObj.decode(OBJECT_TO_IDX[obj_type], COLOR_TO_IDX[obj_color], 0)
         pos = self.place_obj(obj)
 
@@ -81,27 +80,41 @@ class ContrastiveDataset(MiniGridEnv):
         self.targetType, self.target_color = obj_type, obj_color
         self.target_pos = pos
 
+        # Create distractor
+        distr_options = [i for i in range(len(self.splits[self.curr_split])) if i != self.curr_comp_idx]
+        distr_idx = self._rand_elem(distr_options)
+        dist_color, dist_type = self.splits[self.curr_split][distr_idx]
+        dist = WorldObj.decode(OBJECT_TO_IDX[dist_type], COLOR_TO_IDX[dist_color], 0)
+        self.place_obj(dist)
+
         self.label = f"A {self.target_color} {self.targetType}"
         self.mission = self.label
         # print(self.mission)
 
+    # def reset(self, *args, seed=None, options=None):
+    #     obs, _ = super().reset(*args, seed=seed, options=options)
+    #     print('a', obs)
+    #     return obs, self.target_pos
+
     def step(self, action):
         obs, reward, terminated, truncated, info = super().step(action)
-
-        ax, ay = self.agent_pos
-        tx, ty = self.target_pos
+        done = False
 
         # Toggle/pickup action terminates the episode
-        if action == self.actions.toggle:
-            terminated = True
+        if self.carrying:
+            if self.carrying.color == self.target_color and \
+                    self.carrying.type == self.targetType:
+                reward = 1
+                done = True
+            else:
+                reward = -1
+                done = True
 
-        # Reward performing the done action next to the target object
-        if action == self.actions.done:
-            if abs(ax - tx) <= 1 and abs(ay - ty) <= 1:
-                reward = self._reward()
-            terminated = True
+        done = done or terminated or truncated
 
-        return obs, reward, terminated, truncated, info
+        print(done, reward)
+
+        return obs, reward, done, info
 
 
 
@@ -109,17 +122,18 @@ if __name__ == "__main__":
     import argparse
     import gymnasium as gym
     from minigrid.utils.window import Window
+    from minigrid.oracle_agent import OracleAgent
     from PIL import Image
     from pathlib import Path
 
     gym.register(
-        id="ContrastiveDataset-v0",
-        entry_point="minigrid.envs:ContrastiveDataset",
+        id="ContrastiveTrajectoryDataset-v0",
+        entry_point="minigrid.envs:ContrastiveTrajectoryDataset",
     )
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--env", help="gym environment to load", default="ContrastiveDataset-v0"
+        "--env", help="gym environment to load", default="ContrastiveTrajectoryDataset-v0"
     )
     parser.add_argument(
         "--seed",
@@ -142,7 +156,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    env: MiniGridEnv = gym.make(args.env, tile_size=args.tile_size)
+    env: MiniGridEnv = gym.make(args.env, tile_size=args.tile_size, render_mode='rgb_array')
 
     # env = FullyObsWrapper(env)
 
@@ -158,11 +172,23 @@ if __name__ == "__main__":
         num_instances = len(env.splits[split]) * args.num_per_obj
         Path(f'contrastive_dataset/{split}').mkdir(parents=True, exist_ok=True)
         print(f'creating {num_instances} for split: {split}')
-        for i in range(num_instances):
-            env.reset(seed=args.seed)
-            frame = env.get_frame(agent_pov=args.agent_view, highlight=False)
-            img = Image.fromarray(frame)
-            img.save(f'contrastive_dataset/{split}/{env.mission}.{i}.png')
+
+        oracle = OracleAgent(env, visualize=True, agent_view=args.agent_view)
+        demos = oracle.generate_demos(1)
+        mission, obss, actions, rewards, target_cell, label = demos[0]
+
+        print(mission)
+        print(obss)
+        print(actions)
+        print(rewards)
+        print(target_cell)
+        print(label)
+        #
+        # for i in range(num_instances):
+        #     env.reset(seed=args.seed)
+        #     frame = env.get_frame(agent_pov=args.agent_view, highlight=False)
+        #     img = Image.fromarray(frame)
+        #     img.save(f'contrastive_dataset/{split}/{env.mission}.{i}.png')
             #
             # print(type(frame))
             # window.show_img(frame)

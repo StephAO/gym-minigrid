@@ -2,10 +2,10 @@
 import time
 import argparse
 import numpy as np
-import gym
-import gym_minigrid
-from gym_minigrid.wrappers import *
-from gym_minigrid.window import Window
+import gymnasium as gym
+import minigrid
+from minigrid.wrappers import *
+from minigrid.utils.window import Window
 
 VEC_TO_DIR = {
     (1, 0): 0,
@@ -27,21 +27,21 @@ class OracleAgent:
         if self.agent_view:
             img = obs['image']
         else:
-            img = self.env.render('rgb_array', tile_size=32)
+            img = self.env.render() #'rgb_array', tile_size=32)
         self.window.show_img(img)
 
     def reset(self):
         if self.seed != -1:
             self.env.seed(self.seed)
 
-        obs = self.env.reset()
+        obs, _ = self.env.reset()
 
         if hasattr(self.env, 'mission') and self.visualize:
             # print('Mission: %s' % self.env.mission)
             self.window.set_caption(self.env.mission)
         if self.visualize:
             self.redraw(obs)
-        return obs, self.env.target_cell
+        return obs, self.env.target_pos
 
 
     def step(self, action):
@@ -151,6 +151,7 @@ class OracleAgent:
         for demo in range(num_demos):
             obss, rewards, actions = [], [], []
             obs, target = self.reset()
+            print(obs)
             mission = obs["mission"]
             if self.visualize:
                 # Blocking event loop
@@ -164,7 +165,7 @@ class OracleAgent:
                 actions.append(action)
                 rewards.append(reward)
                 if self.visualize:
-                    time.sleep(2)
+                    time.sleep(0.5)
                 if done:
                     break
 
@@ -174,7 +175,7 @@ class OracleAgent:
             assert sum(rewards) > 0
             assert done
 
-            demos.append( (mission, obss, actions, rewards, self.env.target_cell, self.env.label) )
+            demos.append( (mission, obss, actions, rewards, self.env.target_pos, self.env.label) )
 
         if self.visualize:
             self.window.close()
