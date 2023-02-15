@@ -8,6 +8,17 @@ from minigrid.core.world_object import Wall
 
 
 def register_minigrid_envs():
+
+    # Custom env
+    # ----------------------------------------
+
+    register(
+        id="ContrastiveTrajectoryDataset-v0",
+        entry_point="minigrid.envs:ContrastiveTrajectoryDataset",
+    )
+
+
+
     # BlockedUnlockPickup
     # ----------------------------------------
 

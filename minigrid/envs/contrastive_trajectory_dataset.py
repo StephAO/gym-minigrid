@@ -17,9 +17,9 @@ class ContrastiveTrajectoryDataset(MiniGridEnv):
     Environment in which the agent is instructed to go to a given object
     named using an English text string
     """
-    def __init__(self, size=7, numObjs=1, splits=(0.7, 0.1, 0.2), max_steps: int | None = None, **kwargs):
+    def __init__(self, size=8, numObjs=2, splits=(0.7, 0.1, 0.2), max_steps: int | None = None, **kwargs):
 
-        # self.numObjs = numObjs
+        self.numObjs = numObjs
         self.size = size
         # Types of objects to be generated
 
@@ -59,7 +59,7 @@ class ContrastiveTrajectoryDataset(MiniGridEnv):
 
     @staticmethod
     def _gen_mission(color: str, obj_type: str):
-        return f"A {color} {obj_type}"
+        return f"Pickup {color} {obj_type}"
 
     def _gen_grid(self, width, height):
         self.grid = Grid(width, height)
@@ -81,13 +81,14 @@ class ContrastiveTrajectoryDataset(MiniGridEnv):
         self.target_pos = pos
 
         # Create distractor
-        distr_options = [i for i in range(len(self.splits[self.curr_split])) if i != self.curr_comp_idx]
-        distr_idx = self._rand_elem(distr_options)
-        dist_color, dist_type = self.splits[self.curr_split][distr_idx]
-        dist = WorldObj.decode(OBJECT_TO_IDX[dist_type], COLOR_TO_IDX[dist_color], 0)
-        self.place_obj(dist)
+        for _ in range(self.numObjs - 1):
+            distr_options = [i for i in range(len(self.splits[self.curr_split])) if i != self.curr_comp_idx]
+            distr_idx = self._rand_elem(distr_options)
+            dist_color, dist_type = self.splits[self.curr_split][distr_idx]
+            dist = WorldObj.decode(OBJECT_TO_IDX[dist_type], COLOR_TO_IDX[dist_color], 0)
+            self.place_obj(dist)
 
-        self.label = f"A {self.target_color} {self.targetType}"
+        self.label = f"Pickup {self.target_color} {self.targetType}"
         self.mission = self.label
         # print(self.mission)
 
@@ -112,10 +113,9 @@ class ContrastiveTrajectoryDataset(MiniGridEnv):
 
         done = done or terminated or truncated
 
-        print(done, reward)
+        # print(done, reward)
 
         return obs, reward, done, info
-
 
 
 if __name__ == "__main__":
@@ -162,6 +162,7 @@ if __name__ == "__main__":
 
     if args.agent_view:
         print("Using agent view")
+        
         env = RGBImgPartialObsWrapper(env, env.tile_size)
         env = ImgObsWrapper(env)
 
