@@ -30,7 +30,6 @@ def main(args):
     
 
     save_dir = args.save_dir
-    z_fill_n = 7 # number of zeros to append to save traj file name
 
     offset = 0 # change this if do not want to overwrite
     traj_per_env = args.traj_per_env
@@ -38,13 +37,17 @@ def main(args):
     max_traj_len = args.max_traj_len
     print_freq = args.print_freq
     render = args.render
+    save_suffix = args.save_suffix
 
+
+    if not os.path.isdir(save_dir):
+        os.makedirs (save_dir)
 
     print("=" * 60)
     print("SAVING DEMOS")
     print("=" * 60)
     print("save_dir : ", save_dir)
-    print("z_fill_n: ", z_fill_n)
+    print("save_suffix: ", save_suffix)
     print("offset: ", offset)
     print("traj_per_env: ", traj_per_env)
     print("min_traj_len: ", min_traj_len)
@@ -69,7 +72,10 @@ def main(args):
         env_save_dir = os.path.join(save_dir, env_name)
         if not os.path.isdir(env_save_dir):
             os.makedirs (env_save_dir)
-            
+        
+
+        save_data = []
+
         i = offset
         while i < offset + traj_per_env:
             
@@ -119,6 +125,7 @@ def main(args):
             traj["target_cell"] = torch.tensor(target_cell)
             traj["mission"] = mission
 
+            save_data.append(traj)
 
             # print("=" * 60)
             # print("traj[images]", traj["images"].size())
@@ -140,15 +147,8 @@ def main(args):
             # print("rewards: ", len(rewards), rewards)
             # print("mission: ", mission)
 
-
-            # save the trajectory
-            traj_name = env_name + '_demo_' + str(i).zfill(z_fill_n) + ".pt"
-            save_path = os.path.join(env_save_dir, traj_name)
-            
-            torch.save(traj, save_path)
-
             if i % print_freq == 0:
-                print("saved trajectory num: ", i)
+                print("completed trajectory num: ", i)
 
             # book keeping
             i += 1
@@ -158,12 +158,17 @@ def main(args):
             num_traj += 1
 
 
+        # save all the trajectory
+        save_data_name = env_name + '_demos_' + str(num_traj) + save_suffix + ".pt"
+        save_data_path = os.path.join(env_save_dir, save_data_name)
+        torch.save(save_data, save_data_path)
+        
+
         # avg trajectory len
         traj_len_avg = round(traj_len_sum / num_traj, 2)
         global_traj_len_max = max(global_traj_len_max, traj_len_max)
 
-        print("completed saving demos for: ", env_name)
-        print("num_traj: ", num_traj)
+        print("completed saving demos at: ", save_data_path)
         print("traj_len_min: ", traj_len_min)
         print("traj_len_max: ", traj_len_max)
         print("traj_len_avg: ", traj_len_avg)
@@ -194,7 +199,7 @@ python3 -m minigrid.generate_demos --traj_per_env 10
 python3 -m minigrid.generate_demos --traj_per_env 100000 --print_freq 20000
 
 
-global_traj_len_max = 32
+global_traj_len_max = 30
 global avg = 9
 
 
@@ -215,6 +220,12 @@ if __name__ == "__main__":
         type=str,
         default="./minigrid_demos",
         help="save demos in this directory",
+    )
+    parser.add_argument(
+        "--save_suffix",
+        type=str,
+        default="",
+        help="suffix to be added to saved file",
     )
     parser.add_argument(
         "--min_traj_len",
@@ -253,30 +264,35 @@ if __name__ == "__main__":
     main(args)
 
 
-    ### test by loading some saved trajectories ### 
+    # ## test by loading some saved trajectories ### 
     # env_name = "MiniGrid-GoToObject-8x8-N2-v0"
     # load_dir = "./minigrid_demos/" + env_name
-    # load_traj_name = env_name + "_demo_0000002.pt"
-    
-    # load_traj_path = os.path.join(load_dir, load_traj_name)
+    # load_data_name = env_name + "_demos_" + "100" + ".pt"
+
+    # load_data_path = os.path.join(load_dir, load_data_name)
     
     # print("=" * 60)
     # print("TESTING")
     # print("=" * 60)
 
-    # print("load_traj_path: ", load_traj_path)
+    # print("load_data_path: ", load_data_path)
 
-    # traj = torch.load(load_traj_path)
+    # traj_data = torch.load(load_data_path)
     
-    # print("traj[images]", traj["images"].size())
-    # print("traj[directions]", traj["directions"].size(), traj["directions"])
-    # print("traj[actions]", traj["actions"].size(), traj["actions"])
-    # print("traj[rewards]", traj["rewards"].size(), traj["rewards"])
-    # print("traj[done]", traj["done"].size(), traj["done"])
-    # print("traj[target_cell]", traj["target_cell"])
-    # print("traj[mission]", traj["mission"])
+    # for i in range(3): 
 
-    # print("=" * 60)
+    #     traj = traj_data[i]
+
+    #     print("traj num: ", i)
+    #     print("traj[images]", traj["images"].size())
+    #     print("traj[directions]", traj["directions"].size(), traj["directions"])
+    #     print("traj[actions]", traj["actions"].size(), traj["actions"])
+    #     print("traj[rewards]", traj["rewards"].size(), traj["rewards"])
+    #     print("traj[done]", traj["done"].size(), traj["done"])
+    #     print("traj[target_cell]", traj["target_cell"])
+    #     print("traj[mission]", traj["mission"])
+
+    #     print("=" * 60)
 
 
 
