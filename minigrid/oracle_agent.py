@@ -15,7 +15,7 @@ VEC_TO_DIR = {
 }
 
 class OracleAgent:
-    def __init__(self, env, visualize=True, seed=-1, agent_view=True):
+    def __init__(self, env, visualize=True, seed=-1, agent_view=False):
         self.env = env
         self.visualize = visualize
         self.seed = seed
@@ -45,7 +45,12 @@ class OracleAgent:
 
 
     def step(self, action):
-        obs, reward, done, info = self.env.step(action)
+
+        ## obs, reward, done, info = self.env.step(action)
+
+        obs, reward, done, info = self.env.step(action)[:4] #####################################
+
+
         if done and self.visualize:
             print(f'step={self.env.step_count}, reward={reward:.2f}, done={done}')
 
@@ -63,14 +68,21 @@ class OracleAgent:
         for cell in path:
             cell = np.array(cell)
             while not (self.env.agent_pos == cell).all():
-                yield self.next_action(cell, next_cell_is_goal= (cell == goal).all() )
+                yield self.next_action(cell, next_cell_is_goal = (cell == goal).all() )
 
     def next_action(self, next_cell, next_cell_is_goal=False):
         curr_pos, curr_dir = self.env.agent_pos, self.env.agent_dir
         required_dir = VEC_TO_DIR[tuple(next_cell - curr_pos)]
         if required_dir == curr_dir:
-            if next_cell_is_goal:
-                return self.env.actions.pickup
+
+            if next_cell_is_goal: # Modification for Go to door and object #####################################
+                if "go to" in self.env.mission.lower():
+                    return self.env.actions.done
+                elif "pickup" in self.env.mission.lower():
+                    return self.env.actions.pickup
+
+                # default action when reached goal
+                return self.env.actions.done
             else:
                 return self.env.actions.forward
         elif abs(required_dir - curr_dir) == 2:
@@ -141,7 +153,9 @@ class OracleAgent:
                 queue.append((next_state, (i, j)))
 
         # Path not found
-        print("path not found")
+        
+        # print("path not found") #################### commenting this out 
+
         return None, None, previous_pos
 
     def generate_demos(self, num_demos=1):
@@ -151,21 +165,21 @@ class OracleAgent:
         for demo in range(num_demos):
             obss, rewards, actions = [], [], []
             obs, target = self.reset()
-            print(obs)
             mission = obs["mission"]
             if self.visualize:
                 # Blocking event loop
                 self.window.show(block=False)
-
+            
+            action = None
             for action in self.get_sequence(target):
                 if action is None:
                     break
                 obss.append(obs)
                 obs, reward, done, info = self.step(action)
-                actions.append(action)
+                actions.append(action.value)
                 rewards.append(reward)
                 if self.visualize:
-                    time.sleep(0.5)
+                    time.sleep(0.2)
                 if done:
                     break
 
@@ -175,13 +189,17 @@ class OracleAgent:
             assert sum(rewards) > 0
             assert done
 
-            demos.append( (mission, obss, actions, rewards, self.env.target_pos, self.env.label) )
+            try:
+                label = self.env.label
+            except:
+                label = "None"
+
+            demos.append( (mission, obss, actions, rewards, self.env.target_pos, label) )
 
         if self.visualize:
             self.window.close()
 
         return demos
-
 
 
 if __name__ == "__main__":
