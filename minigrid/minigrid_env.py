@@ -42,9 +42,10 @@ class MiniGridEnv(gym.Env):
         drop = 4
         # Toggle/activate an object
         toggle = 5
-
         # Done completing task
         done = 6
+        stay = 7
+
 
     def __init__(
         self,
@@ -574,7 +575,7 @@ class MiniGridEnv(gym.Env):
                 fwd_cell.toggle(self, fwd_pos)
 
         # Done action (not used by default)
-        elif action == self.actions.done:
+        elif action == self.actions.done or action == self.actions.stay:
             pass
 
         else:

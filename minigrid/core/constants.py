@@ -92,12 +92,12 @@ STATE_TO_IDX = {
 # Map of agent direction indices to vectors
 DIR_TO_VEC = [
     # Pointing right (positive X)
-    np.array((1, 0)),
+    np.array((1, 0)), # EAST
     # Down (positive Y)
-    np.array((0, 1)),
+    np.array((0, 1)), # SOUTH
     # Pointing left (negative X)
-    np.array((-1, 0)),
+    np.array((-1, 0)), # WEST
     # Up (negative Y)
-    np.array((0, -1)),
+    np.array((0, -1)), # NORTH
 ]
 

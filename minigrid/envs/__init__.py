@@ -25,6 +25,7 @@ from minigrid.envs.putnear import PutNearEnv
 from minigrid.envs.redbluedoors import RedBlueDoorEnv
 from minigrid.envs.unlock import UnlockEnv
 from minigrid.envs.unlockpickup import UnlockPickupEnv
-# from gym_minigrid.envs.negated_goals import *
+from minigrid.envs.negated_goals import NegatedEnv, NegatedSimple
 from minigrid.envs.contrastive_dataset import ContrastiveDataset
 from minigrid.envs.contrastive_trajectory_dataset import ContrastiveTrajectoryDataset
+from minigrid.envs.directions_dataset import DirectionsDataset

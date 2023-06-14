@@ -15,6 +15,7 @@ class Actions(IntEnum):
     drop = 4
     # Toggle/activate an object
     toggle = 5
-
     # Done completing task
     done = 6
+    # Stay
+    stay = 7

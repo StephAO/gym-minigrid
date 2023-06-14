@@ -10,6 +10,8 @@ from minigrid.core.mission import MissionSpace
 from minigrid.core.constants import COLOR_NAMES, NON_BASE_OBJ_NAMES, OBJECT_TO_IDX, COLOR_TO_IDX
 from minigrid.core.world_object import WorldObj
 from minigrid.minigrid_env import MiniGridEnv
+from minigrid.wrappers import ImgObsWrapper, RGBImgPartialObsWrapper
+
 
 
 class ContrastiveTrajectoryDataset(MiniGridEnv):
@@ -111,8 +113,6 @@ class ContrastiveTrajectoryDataset(MiniGridEnv):
                 done = True
 
         done = done or terminated or truncated
-
-        print(done, reward)
 
         return obs, reward, done, info
 

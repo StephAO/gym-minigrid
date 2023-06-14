@@ -1076,6 +1076,10 @@ def register_minigrid_envs():
         id="ContrastiveDataset-v0",
         entry_point="minigrid.envs:ContrastiveDataset",
     )
+    register(
+        id='MiniGrid-Negated-Simple-v0',
+        entry_point='minigrid.envs:NegatedSimple'
+    )
 
 
 __version__ = "2.1.0"

@@ -41,18 +41,18 @@ class OracleAgent:
             self.window.set_caption(self.env.mission)
         if self.visualize:
             self.redraw(obs)
-        return obs, self.env.target_pos
+        return obs, self.env.target_cell
 
 
     def step(self, action):
-        obs, reward, done, info = self.env.step(action)
-        if done and self.visualize:
+        obs, reward, terminated, truncated, info = self.env.step(action)
+        if terminated and self.visualize:
             print(f'step={self.env.step_count}, reward={reward:.2f}, done={done}')
 
         if self.visualize:
             self.redraw(obs)
 
-        return obs, reward, done, info
+        return obs, reward, terminated, info
 
     def get_sequence(self, goal):
         initial_states = [(*self.env.agent_pos, *self.env.dir_vec)]
@@ -174,7 +174,7 @@ class OracleAgent:
 
             assert sum(rewards) > 0
             assert done
-            demos.append( (mission, obss, actions, rewards, self.env.target_pos, self.env.label) )
+            demos.append( (mission, obss, actions, rewards, self.env.target_cell, self.env.label) )
 
         if self.visualize:
             self.window.close()
