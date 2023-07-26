@@ -668,7 +668,7 @@ class MiniGridEnv(gym.Env):
 
     def get_full_render(self, highlight, tile_size):
         """
-        Render a non-paratial observation for visualization
+        Render a non-partial observation for visualization
         """
         # Compute which cells are visible to the agent
         _, vis_mask = self.gen_obs_grid()

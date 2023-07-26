@@ -136,9 +136,16 @@ class WorldObj:
             v = Chair(color)
         elif obj_type == 'flower':
             v = Flower(color)
-
         elif obj_type == 'crate':
             v = Crate(color)
+        elif obj_type == 'north':
+            v = North(color)
+        elif obj_type == 'east':
+            v = East(color)
+        elif obj_type == 'south':
+            v = South(color)
+        elif obj_type == 'west':
+            v = West(color)
         else:
             assert False, "unknown object type in decode '%s'" % obj_type
 
@@ -551,6 +558,85 @@ class Flower(WorldObj):
         fill_coords(img, point_in_circle(0.34, 0.3, 0.07), c)
         fill_coords(img, point_in_circle(0.42, 0.44, 0.07), c)
         fill_coords(img, point_in_circle(0.58, 0.44, 0.07), c)
+
+
+class North(WorldObj):
+    def __init__(self, color):
+        super(North, self).__init__('north', color)
+
+    def can_pickup(self):
+        return False
+
+    def render(self, img):
+        c = COLORS[self.color]
+        # Left Vertical
+        fill_coords(img, point_in_rect(0.2, 0.3, 0.2, 0.8), c)
+        # Right Vertical
+        fill_coords(img, point_in_rect(0.7, 0.8, 0.2, 0.8), c)
+        # Diagonal
+        fill_coords(img, point_in_rect(0.6, 0.7, 0.65, 0.8), c)
+        fill_coords(img, point_in_rect(0.5, 0.6, 0.5, 0.65), c)
+        fill_coords(img, point_in_rect(0.4, 0.5, 0.35, 0.5), c)
+        fill_coords(img, point_in_rect(0.3, 0.4, 0.2, 0.35), c)
+
+class East(WorldObj):
+    def __init__(self, color):
+        super(East, self).__init__('east', color)
+
+    def can_pickup(self):
+        return False
+
+    def render(self, img):
+        c = COLORS[self.color]
+        # Left Vertical
+        fill_coords(img, point_in_rect(0.2, 0.3, 0.2, 0.8), c)
+        # Top Horizontal
+        fill_coords(img, point_in_rect(0.2, 0.8, 0.7, 0.8), c)
+        # Middle Horizontal
+        fill_coords(img, point_in_rect(0.2, 0.5, 0.45, 0.55), c)
+        # Bottom Horizontal
+        fill_coords(img, point_in_rect(0.2, 0.8, 0.2, 0.3), c)
+
+class South(WorldObj):
+    def __init__(self, color):
+        super(South, self).__init__('south', color)
+
+    def can_pickup(self):
+        return False
+
+    def render(self, img):
+        c = COLORS[self.color]
+        # Top Horizontal
+        fill_coords(img, point_in_rect(0.2, 0.8, 0.7, 0.8), c)
+        # Left Vertical
+        fill_coords(img, point_in_rect(0.2, 0.3, 0.3, 0.55), c)
+        # Middle Horizontal
+        fill_coords(img, point_in_rect(0.2, 0.8, 0.45, 0.55), c)
+        # Right Vertical
+        fill_coords(img, point_in_rect(0.7, 0.8, 0.45, 0.7), c)
+        # Bottom Horizontal
+        fill_coords(img, point_in_rect(0.2, 0.8, 0.2, 0.3), c)
+
+class West(WorldObj):
+    def __init__(self, color):
+        super(West, self).__init__('west', color)
+
+    def can_pickup(self):
+        return False
+
+    def render(self, img):
+        c = COLORS[self.color]
+        # Left Vertical
+        fill_coords(img, point_in_rect(0.2, 0.3, 0.2, 0.8), c)
+        # Right Vertical
+        fill_coords(img, point_in_rect(0.7, 0.8, 0.2, 0.8), c)
+        # Diagonals
+        fill_coords(img, point_in_rect(0.30, 0.38, 0.6, 0.75), c)
+        fill_coords(img, point_in_rect(0.38, 0.46, 0.5, 0.65), c)
+        fill_coords(img, point_in_rect(0.46, 0.54, 0.4, 0.55), c)
+        fill_coords(img, point_in_rect(0.54, 0.62, 0.5, 0.65), c)
+        fill_coords(img, point_in_rect(0.62, 0.70, 0.6, 0.75), c)
+
 
 
 

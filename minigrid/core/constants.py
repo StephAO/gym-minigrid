@@ -69,7 +69,11 @@ OBJECT_TO_IDX = {
     'building'      : 27,
     'crate'         : 28,
     'chair'         : 29,
-    'flower'        : 30
+    'flower'        : 30,
+    'north'         : 31,
+    'east'          : 32,
+    'south'         : 33,
+    'west'          : 34
 }
 
 OBJECT_NAMES = sorted(list(OBJECT_TO_IDX.keys()))

@@ -3,6 +3,7 @@ from __future__ import annotations
 import itertools
 import numpy as np
 import os
+from PIL import Image
 import random
 from tqdm import tqdm
 
@@ -15,16 +16,26 @@ from minigrid.core.world_object import WorldObj
 from minigrid.minigrid_env import MiniGridEnv
 from minigrid.wrappers import ImgObsWrapper, RGBImgPartialObsWrapper
 
-
 ACTION_VERBS = {'turn left': [Actions.left], 'turn right': [Actions.right], 'go straight': [Actions.forward],
                 'turn around': [Actions.right, Actions.right],
                 'turn 90 degrees clockwise': [Actions.right],
                 'turn 180 degrees clockwise': [Actions.right, Actions.right],
                 'turn 270 degrees clockwise': [Actions.right, Actions.right, Actions.right],
+                'turn 360 degrees clockwise': [Actions.right, Actions.right, Actions.right, Actions.right],
+                'turn 540 degrees clockwise': [Actions.right, Actions.right, Actions.right, Actions.right, Actions.right],
+                'turn 720 degrees clockwise': [Actions.right, Actions.right, Actions.right, Actions.right, Actions.right, Actions.right],
                 'turn 90 degrees counterclockwise': [Actions.left],
                 'turn 180 degrees counterclockwise': [Actions.left, Actions.left],
                 'turn 270 degrees counterclockwise': [Actions.left, Actions.left, Actions.left]
                 }
+
+COMPOSITIONAL_VERBS = {
+                'turn 360 degrees counterclockwise': [Actions.left, Actions.left, Actions.left, Actions.left],
+                'turn 540 degrees counterclockwise': [Actions.left, Actions.left, Actions.left, Actions.left, Actions.left],
+                'turn 720 degrees counterclockwise': [Actions.left, Actions.left, Actions.left, Actions.left, Actions.left, Actions.left]
+}
+
+ALL_VERBS = ACTION_VERBS | COMPOSITIONAL_VERBS
 
 DIRECTIONS_IDX_TO_STR = ['east', 'south', 'west', 'north']
 
@@ -35,26 +46,37 @@ class DirectionsDataset(MiniGridEnv):
     named using an English text string
     """
 
-    def __init__(self, size=7, max_verbs=4, splits=(0.7, 0.1, 0.2), simple_obs=True, **kwargs):
+    def __init__(self, size=3, max_verbs=2, splits=(0.8, 0.2), obs_type='grid', **kwargs):
         self.size = size
-        self.simple_obs = simple_obs
+        self.max_verbs = max_verbs
+        self.obs_type = obs_type
+        self.tile_size = 16
 
-        self.all_sequences = []
+        # Base sequences
+        base_sequences = []
         for i in range(max_verbs + 1):
-            self.all_sequences += list(itertools.product(ACTION_VERBS.keys(), repeat=i))
-        random.shuffle(self.all_sequences)
+            base_sequences += list(itertools.product(ACTION_VERBS.keys(), repeat=i))
+        split = int(splits[0] * len(base_sequences)) #, int(sum(splits[:2]) * len(self.all_sequences))
+        # Compositional sequences. Sequences that include at least one unseen verb
+        comp_seqs = [seq for seq in itertools.product(ALL_VERBS.keys(), repeat=max_verbs) if
+                     any(v in COMPOSITIONAL_VERBS.keys() for v in seq)]
+        random.shuffle(comp_seqs)
+        comp_seqs = comp_seqs[:10000]
+        # Length sequences
+        longer_seqs = list(itertools.product(ACTION_VERBS.keys(), repeat=max_verbs + 1))
+        random.shuffle(longer_seqs)
+        longer_seqs = longer_seqs[:10000]
+        self.splits = {'train': base_sequences[:split],
+                       # 'val': self.all_sequences[splits[0]:splits[1]],
+                       'test': base_sequences[split:],
+                       'compositional': comp_seqs,
+                       'length': longer_seqs}
 
-        splits = int(splits[0] * len(self.all_sequences)), int(sum(splits[:2]) * len(self.all_sequences))
-        self.splits = {'train': self.all_sequences[:splits[0]],
-                       'val': self.all_sequences[splits[0]:splits[1]],
-                       'test': self.all_sequences[splits[1]:]}
-        self.curr_split = 'train'
-        self.curr_idx = -1
-        self.curr_dir = -1
+        self.set_split('train')
 
         mission_space = MissionSpace(
             mission_func=self._gen_mission,
-            ordered_placeholders=[[0, 1, 2, 3], self.all_sequences],
+            ordered_placeholders=[[0, 1, 2, 3], [seq for split_seqs in self.splits.values() for seq in split_seqs]],
         )
 
         super().__init__(
@@ -65,6 +87,7 @@ class DirectionsDataset(MiniGridEnv):
             # Set this to True for maximum speed
             see_through_walls=True,
             max_steps=max_verbs * 10,
+            agent_view_size=size,
             **kwargs,
         )
 
@@ -72,9 +95,10 @@ class DirectionsDataset(MiniGridEnv):
         self.curr_split = split
         self.curr_idx = -1
         self.curr_dir = -1
+        random.shuffle(self.splits[self.curr_split])
 
     @staticmethod
-    def _gen_mission(starting_dir: str, sequence: str):
+    def _gen_mission(starting_dir: int, sequence: str):
         mission = f'An agent is facing {DIRECTIONS_IDX_TO_STR[starting_dir]}'
         for i, verb in enumerate(sequence):
             if i == 0:
@@ -85,16 +109,29 @@ class DirectionsDataset(MiniGridEnv):
         return mission
 
     def get_obs(self):
-        if self.simple_obs:
-            return np.eye(4)[self.agent_dir].tolist()
+        if self.obs_type == 'simple':
+            obs = np.eye(4)[self.agent_dir].tolist()
+        elif self.obs_type == 'image':
+            obs = self.get_frame(agent_pov=True, highlight=False, tile_size=16).transpose(2, 0, 1)
+            # img = Image.fromarray(obs)
+            # img.show()
+        elif self.obs_type == 'grid':
+            obs = self.gen_obs()['image']
         else:
-            return self.get_obs()
+            raise NotImplementedError(f'{self.obs_type} is not a supporter observation type')
+        return obs
 
     def _gen_grid(self, width, height):
         self.grid = Grid(width, height)
 
         # Generate the surrounding walls
         self.grid.wall_rect(0, 0, width, height)
+
+        # Set up visual compass
+        self.put_obj(WorldObj.decode(OBJECT_TO_IDX['west'], COLOR_TO_IDX['red'], 0), 0, self.width // 2)
+        self.put_obj(WorldObj.decode(OBJECT_TO_IDX['south'], COLOR_TO_IDX['red'], 0), self.height // 2, self.width - 1)
+        self.put_obj(WorldObj.decode(OBJECT_TO_IDX['east'], COLOR_TO_IDX['red'], 0), self.height - 1, self.width // 2)
+        self.put_obj(WorldObj.decode(OBJECT_TO_IDX['north'], COLOR_TO_IDX['red'], 0), self.height // 2, 0)
 
         # Get next sequence
         self.curr_dir += 1
@@ -120,7 +157,7 @@ class DirectionsDataset(MiniGridEnv):
             action = Actions.stay
         else:
             curr_verb = self.curr_seq[self.curr_verb_step]
-            action = ACTION_VERBS[curr_verb][self.curr_action_step]
+            action = ALL_VERBS[curr_verb][self.curr_action_step]
         obs, reward, terminated, truncated, info = super().step(action)
 
         self.traj_obss.append(self.get_obs())
@@ -130,7 +167,7 @@ class DirectionsDataset(MiniGridEnv):
         if len(self.curr_seq) == 0:
             terminated = True
             self.answer = f' {DIRECTIONS_IDX_TO_STR[self.agent_dir]}'
-        elif self.curr_action_step >= len(ACTION_VERBS[curr_verb]):
+        elif self.curr_action_step >= len(ALL_VERBS[curr_verb]):
             self.curr_action_step = 0
             self.curr_verb_step += 1
             if self.curr_verb_step >= len(self.curr_seq):
@@ -146,7 +183,6 @@ if __name__ == "__main__":
     import argparse
     import gymnasium as gym
     from minigrid.utils.window import Window
-    from PIL import Image
     from pathlib import Path
     import json
 
@@ -166,10 +202,22 @@ if __name__ == "__main__":
         default=None,
     )
     parser.add_argument(
-        "--tile-size", type=int, help="size at which to render tiles", default=32
+        "--tile-size", type=int, help="size at which to render tiles", default=16
     )
     parser.add_argument(
         "--num-per-obj", type=int, help="Number of instances to create for each color/type combination", default=2
+    )
+    parser.add_argument(
+        "--obs-type",
+        type=str,
+        default="simple",
+        help="Observation type. Can be 'simple', 'grid', 'image'",
+    )
+    parser.add_argument(
+        "--max-verbs",
+        type=int,
+        default="2",
+        help="Maximum number of verbs in mission",
     )
     parser.add_argument(
         "--agent-view",
@@ -177,10 +225,14 @@ if __name__ == "__main__":
         help="draw the agent sees (partially observable view)",
         action="store_true",
     )
+    parser.add_argument('--base-dir', type=str, default=Path.cwd(),
+                        help='Base directory to save dataset to.')
 
     args = parser.parse_args()
+    args.base_dir = Path(args.base_dir)
 
-    env: MiniGridEnv = gym.make(args.env, tile_size=args.tile_size)
+    env: MiniGridEnv = gym.make(args.env, max_verbs=args.max_verbs, obs_type=args.obs_type, tile_size=args.tile_size)
+    metadata = {'obs_type': env.obs_type, 'max_verbs': env.max_verbs, 'split_sizes': {}}
 
     # env = FullyObsWrapper(env)
 
@@ -191,12 +243,33 @@ if __name__ == "__main__":
 
     window = Window("minigrid - " + str(env.__class__))
 
-    Path(f'directions_dataset/').mkdir(parents=True, exist_ok=True)
-    for split in ['train', 'val', 'test']:
-        with open(Path(f'directions_dataset/') / f'{split}_dataset.txt', 'w') as dataset_file:
+    data_dir = Path(args.base_dir / 'directions_dataset' / f'{env.obs_type}_{env.max_verbs}verbs')
+    data_dir.mkdir(parents=True, exist_ok=True)
+    if env.obs_type == 'image':
+        obs_shape = (3, env.tile_size * env.size, env.tile_size * env.size)
+        obs_type = 'float32'
+    elif env.obs_type == 'grid':
+        obs_shape = (env.size, env.size, 3)
+        obs_type = 'int'
+    elif env.obs_type == 'simple':
+        obs_shape = (4,)
+        obs_type = 'int'
+    else:
+        obs_shape, obs_type = None, None
+
+    memmap_max_obs = 100000
+
+    metadata['memmap_shape'] = (memmap_max_obs, *obs_shape)
+    metadata['memmap_type'] = obs_type
+    for split in env.splits: # 'val'
+        with open(data_dir / f'{split}_dataset.txt', 'w') as dataset_file:
             offsets = [0]
+            curr_observation_file_idx = 1
+            curr_observation_memmap = np.memmap(str(data_dir / f'obss_{split}_{curr_observation_file_idx}.memmap'),
+                                                dtype=obs_type, mode='w+', shape=(memmap_max_obs, *obs_shape))
+            curr_obs_idx = 0
             env.set_split(split)
-            num_instances = 4 * len(env.splits[split]) # for each direction
+            num_instances = 4 * len(env.splits[split])  # for each direction
             print(f'creating {num_instances} for split: {split}')
             for i in tqdm(range(num_instances)):
                 env.reset(seed=args.seed)
@@ -204,9 +277,22 @@ if __name__ == "__main__":
                 while not done:
                     _, _, done, _, _ = env.step(None)
                 mission, obss, actions, answer = env.get_trajectory_info()
-                traj_str = json.dumps((mission, obss, actions, answer))
+                num_obss = len(obss)
+                traj_str = json.dumps((mission, curr_observation_file_idx, curr_obs_idx, num_obss, actions, answer))
                 dataset_file.write(traj_str)
                 offsets.append(offsets[-1] + len(traj_str))
-        with open(Path(f'directions_dataset/') / f'{split}_offset.txt', 'w') as offset_file:
+                if curr_obs_idx + num_obss >= memmap_max_obs:
+                    curr_observation_file_idx += 1
+                    curr_observation_memmap = np.memmap(
+                        str(data_dir / f'obss_{split}_{curr_observation_file_idx}.memmap'), dtype=obs_type, mode='w+',
+                        shape=(memmap_max_obs, *obs_shape))
+                    curr_obs_idx = 0
+                for obs in obss:
+                    curr_observation_memmap[curr_obs_idx] = obs
+                    curr_obs_idx += 1
+        with open(data_dir / f'{split}_offset.txt', 'w') as offset_file:
             json.dump(offsets, offset_file)
+        metadata['split_sizes'][split] = num_instances
 
+    with open(data_dir / f'metadata', 'w') as metadata_file:
+        json.dump(metadata, metadata_file)
