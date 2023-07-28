@@ -16,23 +16,25 @@ from minigrid.core.world_object import WorldObj
 from minigrid.minigrid_env import MiniGridEnv
 from minigrid.wrappers import ImgObsWrapper, RGBImgPartialObsWrapper
 
-ACTION_VERBS = {'turn left': [Actions.left], 'turn right': [Actions.right], 'go straight': [Actions.forward],
+ACTION_VERBS = {'turn left': [Actions.left], 'turn right': [Actions.right], 'go straight': [Actions.stay],
                 'turn around': [Actions.right, Actions.right],
                 'turn 90 degrees clockwise': [Actions.right],
                 'turn 180 degrees clockwise': [Actions.right, Actions.right],
                 'turn 270 degrees clockwise': [Actions.right, Actions.right, Actions.right],
                 'turn 360 degrees clockwise': [Actions.right, Actions.right, Actions.right, Actions.right],
-                'turn 540 degrees clockwise': [Actions.right, Actions.right, Actions.right, Actions.right, Actions.right],
-                'turn 720 degrees clockwise': [Actions.right, Actions.right, Actions.right, Actions.right, Actions.right, Actions.right],
+                'turn 450 degrees clockwise': [Actions.right, Actions.right, Actions.right, Actions.right, Actions.right],
+                'turn 540 degrees clockwise': [Actions.right, Actions.right, Actions.right, Actions.right, Actions.right, Actions.right],
+                'turn 630 degrees clockwise': [Actions.right, Actions.right, Actions.right, Actions.right, Actions.right, Actions.right, Actions.right],
                 'turn 90 degrees counterclockwise': [Actions.left],
                 'turn 180 degrees counterclockwise': [Actions.left, Actions.left],
-                'turn 270 degrees counterclockwise': [Actions.left, Actions.left, Actions.left]
+                'turn 270 degrees counterclockwise': [Actions.left, Actions.left, Actions.left],
+                'turn 360 degrees counterclockwise': [Actions.left, Actions.left, Actions.left, Actions.left],
                 }
 
 COMPOSITIONAL_VERBS = {
-                'turn 360 degrees counterclockwise': [Actions.left, Actions.left, Actions.left, Actions.left],
-                'turn 540 degrees counterclockwise': [Actions.left, Actions.left, Actions.left, Actions.left, Actions.left],
-                'turn 720 degrees counterclockwise': [Actions.left, Actions.left, Actions.left, Actions.left, Actions.left, Actions.left]
+                'turn 450 degrees counterclockwise': [Actions.left, Actions.left, Actions.left, Actions.left, Actions.left],
+                'turn 540 degrees counterclockwise': [Actions.left, Actions.left, Actions.left, Actions.left, Actions.left, Actions.left],
+                'turn 630 degrees counterclockwise': [Actions.left, Actions.left, Actions.left, Actions.left, Actions.left, Actions.left, Actions.left]
 }
 
 ALL_VERBS = ACTION_VERBS | COMPOSITIONAL_VERBS
