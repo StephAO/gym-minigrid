@@ -21,14 +21,14 @@ ACTION_VERBS = {'turn left': [Actions.left], 'turn right': [Actions.right], 'go 
                 'turn 90 degrees clockwise': [Actions.right],
                 'turn 180 degrees clockwise': [Actions.right, Actions.right],
                 'turn 270 degrees clockwise': [Actions.right, Actions.right, Actions.right],
-                'turn 360 degrees clockwise': [Actions.right, Actions.right, Actions.right, Actions.right],
-                'turn 450 degrees clockwise': [Actions.right, Actions.right, Actions.right, Actions.right, Actions.right],
-                'turn 540 degrees clockwise': [Actions.right, Actions.right, Actions.right, Actions.right, Actions.right, Actions.right],
-                'turn 630 degrees clockwise': [Actions.right, Actions.right, Actions.right, Actions.right, Actions.right, Actions.right, Actions.right],
+                # 'turn 360 degrees clockwise': [Actions.right, Actions.right, Actions.right, Actions.right],
+                # 'turn 450 degrees clockwise': [Actions.right, Actions.right, Actions.right, Actions.right, Actions.right],
+                # 'turn 540 degrees clockwise': [Actions.right, Actions.right, Actions.right, Actions.right, Actions.right, Actions.right],
+                # 'turn 630 degrees clockwise': [Actions.right, Actions.right, Actions.right, Actions.right, Actions.right, Actions.right, Actions.right],
                 'turn 90 degrees counterclockwise': [Actions.left],
                 'turn 180 degrees counterclockwise': [Actions.left, Actions.left],
                 'turn 270 degrees counterclockwise': [Actions.left, Actions.left, Actions.left],
-                'turn 360 degrees counterclockwise': [Actions.left, Actions.left, Actions.left, Actions.left],
+                # 'turn 360 degrees counterclockwise': [Actions.left, Actions.left, Actions.left, Actions.left],
                 }
 
 COMPOSITIONAL_VERBS = {
@@ -48,7 +48,7 @@ class DirectionsDataset(MiniGridEnv):
     named using an English text string
     """
 
-    def __init__(self, size=3, max_verbs=2, splits=(0.8, 0.2), obs_type='grid', **kwargs):
+    def __init__(self, size=3, max_verbs=2, splits=(0.8, 0.1, 0.1), obs_type='grid', **kwargs):
         self.size = size
         self.max_verbs = max_verbs
         self.obs_type = obs_type
@@ -58,7 +58,7 @@ class DirectionsDataset(MiniGridEnv):
         base_sequences = []
         for i in range(max_verbs + 1):
             base_sequences += list(itertools.product(ACTION_VERBS.keys(), repeat=i))
-        split = int(splits[0] * len(base_sequences)) #, int(sum(splits[:2]) * len(self.all_sequences))
+        splits = int(splits[0] * len(base_sequences)), int(sum(splits[:2]) * len(base_sequences))
         # Compositional sequences. Sequences that include at least one unseen verb
         comp_seqs = [seq for seq in itertools.product(ALL_VERBS.keys(), repeat=max_verbs) if
                      any(v in COMPOSITIONAL_VERBS.keys() for v in seq)]
@@ -68,9 +68,9 @@ class DirectionsDataset(MiniGridEnv):
         longer_seqs = list(itertools.product(ACTION_VERBS.keys(), repeat=max_verbs + 1))
         random.shuffle(longer_seqs)
         longer_seqs = longer_seqs[:10000]
-        self.splits = {'train': base_sequences[:split],
-                       # 'val': self.all_sequences[splits[0]:splits[1]],
-                       'test': base_sequences[split:],
+        self.splits = {'train': base_sequences[:splits[0]],
+                       'val': base_sequences[splits[0]:splits[1]],
+                       'test': base_sequences[splits[1]:],
                        'compositional': comp_seqs,
                        'length': longer_seqs}
 
@@ -107,7 +107,7 @@ class DirectionsDataset(MiniGridEnv):
                 mission += f'. They {verb}'
             else:
                 mission += f', then they {verb}'
-        mission += '. The agent is now facing<mask>.'
+        mission += '. The agent is now facing <mask>.'
         return mission
 
     def get_obs(self):
@@ -168,13 +168,14 @@ class DirectionsDataset(MiniGridEnv):
         self.curr_action_step += 1
         if len(self.curr_seq) == 0:
             terminated = True
-            self.answer = f' {DIRECTIONS_IDX_TO_STR[self.agent_dir]}'
+            self.answer = f'{DIRECTIONS_IDX_TO_STR[self.agent_dir]}'
         elif self.curr_action_step >= len(ALL_VERBS[curr_verb]):
             self.curr_action_step = 0
             self.curr_verb_step += 1
             if self.curr_verb_step >= len(self.curr_seq):
                 terminated = True
-                self.answer = f' {DIRECTIONS_IDX_TO_STR[self.agent_dir]}'
+                self.answer = f'{DIRECTIONS_IDX_TO_STR[self.agent_dir]}'
+
         return obs, reward, terminated, truncated, info
 
     def get_trajectory_info(self):
@@ -279,6 +280,7 @@ if __name__ == "__main__":
                 while not done:
                     _, _, done, _, _ = env.step(None)
                 mission, obss, actions, answer = env.get_trajectory_info()
+                mission = mission.replace('<mask>', answer)
                 num_obss = len(obss)
                 traj_str = json.dumps((mission, curr_observation_file_idx, curr_obs_idx, num_obss, actions, answer))
                 dataset_file.write(traj_str)
