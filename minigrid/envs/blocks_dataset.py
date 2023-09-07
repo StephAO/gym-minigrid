@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from enum import IntEnum
 import itertools
 import numpy as np
 import os
 from PIL import Image
 import random
 from tqdm import tqdm
+from tying import List, Union, Tuple, Dict
 
 from minigrid.core.actions import Actions
 from minigrid.core.constants import COLOR_NAMES
@@ -17,63 +17,14 @@ from minigrid.core.world_object import WorldObj
 from minigrid.minigrid_env import MiniGridEnv
 from minigrid.wrappers import ImgObsWrapper, RGBImgPartialObsWrapper
 
-class DDActions(IntEnum):
-    # Turn left, turn right, move forward
-    left = 0
-    right = 1
-    turn_around = 2
-    stay = 3
+ACTION_VERBS = ['pick up the <c1> block and put it on the <c2> block',
+                'stack the <c1> block on the <c2> block',
+                'move the <c1> block onto the <c2> block',
+                'grab the <c1> block and place it on the <c2> block',
+                ]
 
-
-
-USE_HIGH_LEVEL_ACTIONS = True
-LL_ACTION_VERBS = {'turn left': [DDActions.left], 'turn right': [DDActions.right], 'go straight': [DDActions.stay],
-                'turn around': [DDActions.right, DDActions.right],
-                'turn 90 degrees clockwise': [DDActions.right],
-                'turn 180 degrees clockwise': [DDActions.right, DDActions.right],
-                'turn 270 degrees clockwise': [DDActions.right, DDActions.right, DDActions.right],
-
-                'rotate 90 degrees clockwise': [DDActions.right],
-                'rotate 180 degrees clockwise': [DDActions.right, DDActions.right],
-                'rotate 270 degrees clockwise': [DDActions.right, DDActions.right, DDActions.right],
-
-                'turn 90 degrees counterclockwise': [DDActions.left],
-                'turn 180 degrees counterclockwise': [DDActions.left, DDActions.left],
-                'turn 270 degrees counterclockwise': [DDActions.left, DDActions.left, DDActions.left],
-
-                'rotate 180 degrees counterclockwise': [DDActions.left, DDActions.left],
-                'rotate 270 degrees counterclockwise': [DDActions.left, DDActions.left, DDActions.left],
-                }
-
-HL_ACTION_VERBS = {'turn left': [DDActions.left], 'turn right': [DDActions.right], 'go straight': [DDActions.stay],
-                'turn around': [DDActions.turn_around],
-                'turn 90 degrees clockwise': [DDActions.right],
-                'turn 180 degrees clockwise': [DDActions.turn_around],
-                'turn 270 degrees clockwise': [DDActions.left],
-
-                'rotate 90 degrees clockwise': [DDActions.right],
-                'rotate 180 degrees clockwise': [DDActions.turn_around],
-                'rotate 270 degrees clockwise': [DDActions.left],
-
-                'turn 90 degrees counterclockwise': [DDActions.left],
-                'turn 180 degrees counterclockwise': [DDActions.turn_around],
-                'turn 270 degrees counterclockwise': [DDActions.right],
-
-
-                'rotate 180 degrees counterclockwise': [DDActions.turn_around],
-                'rotate 270 degrees counterclockwise': [DDActions.right],
-                }
-
-ACTION_VERBS = HL_ACTION_VERBS if USE_HIGH_LEVEL_ACTIONS else LL_ACTION_VERBS
-
-COMPOSITIONAL_VERBS = {
-                'rotate 90 degrees counterclockwise': [DDActions.left],
-}
-
-ALL_VERBS = ACTION_VERBS | COMPOSITIONAL_VERBS
-
-DIRECTIONS_IDX_TO_STR = ['east', 'south', 'west', 'north']
-
+ALL_COLORS = ['red', 'green', 'blue', 'yellow']
+C1_COLORS = ['red', 'green', 'blue']
 
 class DirectionsDataset(MiniGridEnv):
     """
@@ -81,9 +32,10 @@ class DirectionsDataset(MiniGridEnv):
     named using an English text string
     """
 
-    def __init__(self, size=3, max_verbs=2, splits=(0.8, 0.1, 0.1), obs_type='grid', **kwargs):
+    def __init__(self, size=3, max_verbs=2, max_blocks=4, splits=(0.8, 0.1, 0.1), obs_type='grid', **kwargs):
         self.size = size
         self.max_verbs = max_verbs
+        self.max_blocks = max_blocks
         self.obs_type = obs_type
         self.tile_size = 16
 
@@ -125,7 +77,6 @@ class DirectionsDataset(MiniGridEnv):
             agent_view_size=size,
             **kwargs,
         )
-        self.actions = DDActions
 
     def set_split(self, split):
         self.curr_split = split
@@ -134,14 +85,17 @@ class DirectionsDataset(MiniGridEnv):
         random.shuffle(self.splits[self.curr_split])
 
     @staticmethod
-    def _gen_mission(starting_dir: int, sequence: str):
-        mission = f'You are facing {DIRECTIONS_IDX_TO_STR[starting_dir]}'
-        for i, verb in enumerate(sequence):
+    def _gen_mission(starting_blocks: List[str], sequence: List[str], question_block: str):
+        mission = 'A' + ' '.join([f'{c} block, ' for c in starting_blocks]) + ' all start on a table.'
+
+        for i, (c1, c2) in enumerate(sequence):
+            rand_verb_phrase = np.random.choice(ACTION_VERBS)
+            rand_verb_phrase = rand_verb_phrase.replace('<c1>', c1).replace('<c2>', c2)
             if i == 0:
-                mission += f'. They {verb}'
+                mission += f'You ' + rand_verb_phrase
             else:
-                mission += f', then they {verb}'
-        mission += '. You are now facing <mask>.'
+                mission += f', then you {rand_verb_phrase}'
+        mission += f'. The {question_block} is at a height of <mask>.'
         return mission
 
     def get_obs(self):
@@ -188,53 +142,13 @@ class DirectionsDataset(MiniGridEnv):
         self.traj_obss = [self.get_obs()]
         self.traj_actions = []
 
-    def base_step(self, action):
-        self.step_count += 1
-
-        reward, terminated, truncated = 0, False, False
-        # Get the position in front of the agent
-        fwd_pos = self.front_pos
-        # Get the contents of the cell in front of the agent
-        fwd_cell = self.grid.get(*fwd_pos)
-
-        # Rotate left
-        if action == self.actions.left:
-            self.agent_dir -= 1
-            if self.agent_dir < 0:
-                self.agent_dir += 4
-
-        # Rotate right
-        elif action == self.actions.right:
-            self.agent_dir = (self.agent_dir + 1) % 4
-
-        elif action == self.actions.turn_around:
-            self.agent_dir = (self.agent_dir + 2) % 4
-
-        # Done action (not used by default)
-        elif action == self.actions.stay:
-            pass
-
-        else:
-            raise ValueError(f"Unknown action: {action}")
-
-        if self.step_count >= self.max_steps:
-            truncated = True
-
-        if self.render_mode == "human":
-            self.render()
-
-        obs = self.gen_obs()
-
-        return obs, reward, terminated, truncated, {}
-
     def step(self, _):
         if len(self.curr_seq) == 0:
-            action = DDActions.stay
+            action = Actions.stay
         else:
             curr_verb = self.curr_seq[self.curr_verb_step]
             action = ALL_VERBS[curr_verb][self.curr_action_step]
-
-        obs, reward, terminated, truncated, info = self.base_step(action)
+        obs, reward, terminated, truncated, info = super().step(action)
 
         self.traj_obss.append(self.get_obs())
         self.traj_actions.append(action)
@@ -320,7 +234,7 @@ if __name__ == "__main__":
 
     window = Window("minigrid - " + str(env.__class__))
 
-    data_dir = Path(args.base_dir / 'directions_dataset' / f'hier_{env.obs_type}_{env.max_verbs}verbs')
+    data_dir = Path(args.base_dir / 'directions_dataset' / f'{env.obs_type}_{env.max_verbs}verbs')
     data_dir.mkdir(parents=True, exist_ok=True)
     if env.obs_type == 'image':
         obs_shape = (3, env.tile_size * env.size, env.tile_size * env.size)
