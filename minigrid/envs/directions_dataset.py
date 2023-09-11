@@ -50,27 +50,33 @@ HL_ACTION_VERBS = {'turn left': [DDActions.left], 'turn right': [DDActions.right
                 'turn 90 degrees clockwise': [DDActions.right],
                 'turn 180 degrees clockwise': [DDActions.turn_around],
                 'turn 270 degrees clockwise': [DDActions.left],
+                'turn 360 degrees clockwise': [DDActions.stay],
 
-                'rotate 90 degrees clockwise': [DDActions.right],
-                'rotate 180 degrees clockwise': [DDActions.turn_around],
-                'rotate 270 degrees clockwise': [DDActions.left],
+                # 'rotate 90 degrees clockwise': [DDActions.right],
+                # 'rotate 180 degrees clockwise': [DDActions.turn_around],
+                # 'rotate 270 degrees clockwise': [DDActions.left],
 
                 'turn 90 degrees counterclockwise': [DDActions.left],
                 'turn 180 degrees counterclockwise': [DDActions.turn_around],
-                'turn 270 degrees counterclockwise': [DDActions.right],
+                # 'turn 270 degrees counterclockwise': [DDActions.right],
+                'turn 360 degrees counterclockwise': [DDActions.stay],
 
-
-                'rotate 180 degrees counterclockwise': [DDActions.turn_around],
-                'rotate 270 degrees counterclockwise': [DDActions.right],
+                # 'rotate 180 degrees counterclockwise': [DDActions.turn_around],
+                # 'rotate 270 degrees counterclockwise': [DDActions.right],
                 }
 
 ACTION_VERBS = HL_ACTION_VERBS if USE_HIGH_LEVEL_ACTIONS else LL_ACTION_VERBS
 
-COMPOSITIONAL_VERBS = {
+COMPOSITIONAL1_VERBS = {
                 'rotate 90 degrees counterclockwise': [DDActions.left],
+                'spin 90 degrees counterclockwise': [DDActions.left],
 }
 
-ALL_VERBS = ACTION_VERBS | COMPOSITIONAL_VERBS
+COMPOSITIONAL2_VERBS = {
+                'turn 270 degrees counterclockwise': [DDActions.right],
+}
+
+ALL_VERBS = ACTION_VERBS | COMPOSITIONAL1_VERBS | COMPOSITIONAL2_VERBS
 
 DIRECTIONS_IDX_TO_STR = ['east', 'south', 'west', 'north']
 
@@ -91,21 +97,28 @@ class DirectionsDataset(MiniGridEnv):
         base_sequences = []
         for i in range(max_verbs + 1):
             base_sequences += list(itertools.product(ACTION_VERBS.keys(), repeat=i))
+        random.shuffle(base_sequences)
         splits = int(splits[0] * len(base_sequences)), int(sum(splits[:2]) * len(base_sequences))
         # Compositional sequences. Sequences that include at least one unseen verb
-        comp_seqs = [seq for seq in itertools.product(ALL_VERBS.keys(), repeat=max_verbs) if
-                     any(v in COMPOSITIONAL_VERBS.keys() for v in seq)]
-        random.shuffle(comp_seqs)
-        comp_seqs = comp_seqs[:10000]
+        comp_seqs1 = [seq for seq in itertools.product((ACTION_VERBS | COMPOSITIONAL1_VERBS).keys(), repeat=max_verbs) if
+                     any(v in COMPOSITIONAL1_VERBS.keys() for v in seq)]
+        random.shuffle(comp_seqs1)
+        comp_seqs1 = comp_seqs1[:10000]
+
+        comp_seqs2 = [seq for seq in itertools.product((ACTION_VERBS | COMPOSITIONAL2_VERBS).keys(), repeat=max_verbs) if
+                      any(v in COMPOSITIONAL2_VERBS.keys() for v in seq)]
+        random.shuffle(comp_seqs2)
+        comp_seqs2 = comp_seqs2[:10000]
         # Length sequences
-        longer_seqs = list(itertools.product(ACTION_VERBS.keys(), repeat=max_verbs + 1))
-        random.shuffle(longer_seqs)
-        longer_seqs = longer_seqs[:10000]
+        # longer_seqs = list(itertools.product(ACTION_VERBS.keys(), repeat=max_verbs + 1))
+        # random.shuffle(longer_seqs)
+        # longer_seqs = longer_seqs[:10000]
         self.splits = {'train': base_sequences[:splits[0]],
                        'val': base_sequences[splits[0]:splits[1]],
                        'test': base_sequences[splits[1]:],
-                       'compositional': comp_seqs,
-                       'length': longer_seqs}
+                       'compositional1': comp_seqs1,
+                       'compositional2': comp_seqs2, }
+                       # 'length': longer_seqs}
 
         self.set_split('train')
 

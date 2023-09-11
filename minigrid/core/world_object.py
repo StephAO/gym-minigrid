@@ -442,6 +442,46 @@ class Box(WorldObj):
         env.grid.set(*pos, self.contains)
         return True
 
+class Block(WorldObj):
+    def __init__(self, color):
+        super(Block, self).__init__('block', color)
+
+    def can_pickup(self):
+        return True
+
+    def render(self, img):
+        c = COLORS[self.color]
+        # Outline
+        fill_coords(img, point_in_rect(0, 1, 0, 1), c)
+
+class Block(WorldObj):
+    def __init__(self, color):
+        super(Block, self).__init__('block', color)
+
+    def can_pickup(self):
+        return True
+
+    def render(self, img):
+        c = COLORS[self.color]
+        # Outline
+        fill_coords(img, point_in_rect(0, 1, 0, 1), c)
+
+class GrippedBlock(WorldObj):
+    def __init__(self, color):
+        super(GrippedBlock, self).__init__('gripped_block', color)
+
+    def can_pickup(self):
+        return True
+
+    def render(self, img):
+        c = COLORS[self.color]
+        # Outline
+        fill_coords(img, point_in_rect(0, 1, 0, 1), c)
+        fill_coords(img, point_in_rect(0, 0.1, 0, 1), COLOR_TO_IDX['grey'])
+        fill_coords(img, point_in_rect(0.9, 1, 0, 1), COLOR_TO_IDX['grey'])
+        fill_coords(img, point_in_rect(0, 1, 0, 0.1), COLOR_TO_IDX['grey'])
+        fill_coords(img, point_in_rect(0, 1, 0.9, 1), COLOR_TO_IDX['grey'])
+
 class Tree(WorldObj):
     def __init__(self, color):
         super(Tree, self).__init__('tree', color)

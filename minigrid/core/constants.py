@@ -48,6 +48,9 @@ OBJECT_TO_IDX = {
     'goal'          : 5,
     'lava'          : 6,
     'agent'         : 7,
+    # Blocks
+    'block'         : 8,
+    'gripped_block' : 9,
     # Shapes
     'square'        : 11,
     'circle'        : 12,
@@ -73,7 +76,7 @@ OBJECT_TO_IDX = {
     'north'         : 31,
     'east'          : 32,
     'south'         : 33,
-    'west'          : 34
+    'west'          : 34,
 }
 
 OBJECT_NAMES = sorted(list(OBJECT_TO_IDX.keys()))

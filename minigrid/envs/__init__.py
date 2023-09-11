@@ -29,3 +29,4 @@ from minigrid.envs.negated_goals import NegatedEnv, NegatedSimple
 from minigrid.envs.contrastive_dataset import ContrastiveDataset
 from minigrid.envs.contrastive_trajectory_dataset import ContrastiveTrajectoryDataset
 from minigrid.envs.directions_dataset import DirectionsDataset
+from minigrid.envs.blocks_dataset import BlocksDataset
