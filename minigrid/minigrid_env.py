@@ -661,7 +661,7 @@ class MiniGridEnv(gym.Env):
             tile_size,
             agent_pos=(self.agent_view_size // 2, self.agent_view_size - 1),
             agent_dir=3,
-            highlight_mask=vis_mask,
+            # highlight_mask=vis_mask,
         )
 
         return img

@@ -22,7 +22,7 @@ COLOR_NAMES = sorted(list(COLORS.keys()))
 
 # Used to map colors to integers
 COLOR_TO_IDX = {
-    'red'   : 0,
+    'brown' : 0,
     'green' : 1,
     'blue'  : 2,
     'purple': 3,
@@ -30,7 +30,7 @@ COLOR_TO_IDX = {
     'grey'  : 5,
     'white' : 6,
     'cyan'  : 7,
-    'brown' : 8,
+    'red'   : 8,
     'orange': 9
 }
 

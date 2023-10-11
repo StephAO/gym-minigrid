@@ -8,6 +8,7 @@ from minigrid.core.world_object import Wall
 
 
 def register_minigrid_envs():
+    raise ValueError
 
     # Custom env
     # ----------------------------------------

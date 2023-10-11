@@ -17,6 +17,7 @@ from minigrid.core.world_object import WorldObj
 from minigrid.minigrid_env import MiniGridEnv
 from minigrid.wrappers import ImgObsWrapper, RGBImgPartialObsWrapper
 
+
 class DDActions(IntEnum):
     # Turn left, turn right, move forward
     left = 0
@@ -25,58 +26,57 @@ class DDActions(IntEnum):
     stay = 3
 
 
-
 USE_HIGH_LEVEL_ACTIONS = True
 LL_ACTION_VERBS = {'turn left': [DDActions.left], 'turn right': [DDActions.right], 'go straight': [DDActions.stay],
-                'turn around': [DDActions.right, DDActions.right],
-                'turn 90 degrees clockwise': [DDActions.right],
-                'turn 180 degrees clockwise': [DDActions.right, DDActions.right],
-                'turn 270 degrees clockwise': [DDActions.right, DDActions.right, DDActions.right],
+                   'turn around': [DDActions.right, DDActions.right],
+                   'turn 90 degrees clockwise': [DDActions.right],
+                   'turn 180 degrees clockwise': [DDActions.right, DDActions.right],
+                   'turn 270 degrees clockwise': [DDActions.right, DDActions.right, DDActions.right],
 
-                'rotate 90 degrees clockwise': [DDActions.right],
-                'rotate 180 degrees clockwise': [DDActions.right, DDActions.right],
-                'rotate 270 degrees clockwise': [DDActions.right, DDActions.right, DDActions.right],
+                   'rotate 90 degrees clockwise': [DDActions.right],
+                   'rotate 180 degrees clockwise': [DDActions.right, DDActions.right],
+                   'rotate 270 degrees clockwise': [DDActions.right, DDActions.right, DDActions.right],
 
-                'turn 90 degrees counterclockwise': [DDActions.left],
-                'turn 180 degrees counterclockwise': [DDActions.left, DDActions.left],
-                'turn 270 degrees counterclockwise': [DDActions.left, DDActions.left, DDActions.left],
+                   'turn 90 degrees counterclockwise': [DDActions.left],
+                   'turn 180 degrees counterclockwise': [DDActions.left, DDActions.left],
+                   'turn 270 degrees counterclockwise': [DDActions.left, DDActions.left, DDActions.left],
 
-                'rotate 180 degrees counterclockwise': [DDActions.left, DDActions.left],
-                'rotate 270 degrees counterclockwise': [DDActions.left, DDActions.left, DDActions.left],
-                }
+                   'rotate 180 degrees counterclockwise': [DDActions.left, DDActions.left],
+                   'rotate 270 degrees counterclockwise': [DDActions.left, DDActions.left, DDActions.left],
+                   }
 
 HL_ACTION_VERBS = {'turn left': [DDActions.left], 'turn right': [DDActions.right], 'go straight': [DDActions.stay],
-                'turn around': [DDActions.turn_around],
-                'turn 90 degrees clockwise': [DDActions.right],
-                'turn 180 degrees clockwise': [DDActions.turn_around],
-                'turn 270 degrees clockwise': [DDActions.left],
-                'turn 360 degrees clockwise': [DDActions.stay],
+                   'turn around': [DDActions.turn_around],
+                   'turn 90 degrees clockwise': [DDActions.right],
+                   'turn 180 degrees clockwise': [DDActions.turn_around],
+                   'turn 270 degrees clockwise': [DDActions.left],
+                   'turn 360 degrees clockwise': [DDActions.stay],
 
-                # 'rotate 90 degrees clockwise': [DDActions.right],
-                # 'rotate 180 degrees clockwise': [DDActions.turn_around],
-                # 'rotate 270 degrees clockwise': [DDActions.left],
+                   # 'rotate 90 degrees clockwise': [DDActions.right],
+                   # 'rotate 180 degrees clockwise': [DDActions.turn_around],
+                   # 'rotate 270 degrees clockwise': [DDActions.left],
 
-                'turn 90 degrees counterclockwise': [DDActions.left],
-                'turn 180 degrees counterclockwise': [DDActions.turn_around],
-                # 'turn 270 degrees counterclockwise': [DDActions.right],
-                'turn 360 degrees counterclockwise': [DDActions.stay],
+                   'turn 90 degrees counterclockwise': [DDActions.left],
+                   'turn 180 degrees counterclockwise': [DDActions.turn_around],
+                   'turn 270 degrees counterclockwise': [DDActions.right],
+                   'turn 360 degrees counterclockwise': [DDActions.stay],
 
-                # 'rotate 180 degrees counterclockwise': [DDActions.turn_around],
-                # 'rotate 270 degrees counterclockwise': [DDActions.right],
-                }
+                   # 'rotate 180 degrees counterclockwise': [DDActions.turn_around],
+                   # 'rotate 270 degrees counterclockwise': [DDActions.right],
+                   }
 
 ACTION_VERBS = HL_ACTION_VERBS if USE_HIGH_LEVEL_ACTIONS else LL_ACTION_VERBS
 
-COMPOSITIONAL1_VERBS = {
-                'rotate 90 degrees counterclockwise': [DDActions.left],
-                'spin 90 degrees counterclockwise': [DDActions.left],
+# COMPOSITIONAL1_VERBS = {
+#                 'rotate 90 degrees counterclockwise': [DDActions.left],
+#                 'spin 90 degrees counterclockwise': [DDActions.left],
+# }
+
+COMPOSITIONAL_VERBS = {
+    'turn 270 degrees counterclockwise': [DDActions.right],
 }
 
-COMPOSITIONAL2_VERBS = {
-                'turn 270 degrees counterclockwise': [DDActions.right],
-}
-
-ALL_VERBS = ACTION_VERBS | COMPOSITIONAL1_VERBS | COMPOSITIONAL2_VERBS
+ALL_VERBS = ACTION_VERBS | COMPOSITIONAL_VERBS
 
 DIRECTIONS_IDX_TO_STR = ['east', 'south', 'west', 'north']
 
@@ -94,37 +94,40 @@ class DirectionsDataset(MiniGridEnv):
         self.tile_size = 16
 
         # Base sequences
-        base_sequences = []
-        for i in range(max_verbs + 1):
-            base_sequences += list(itertools.product(ACTION_VERBS.keys(), repeat=i))
+        # base_sequences = []
+        # for i in range(max_verbs + 1):
+        base_sequences = list(itertools.product(ACTION_VERBS.keys(), repeat=max_verbs))
         random.shuffle(base_sequences)
-        splits = int(splits[0] * len(base_sequences)), int(sum(splits[:2]) * len(base_sequences))
-        # Compositional sequences. Sequences that include at least one unseen verb
-        comp_seqs1 = [seq for seq in itertools.product((ACTION_VERBS | COMPOSITIONAL1_VERBS).keys(), repeat=max_verbs) if
-                     any(v in COMPOSITIONAL1_VERBS.keys() for v in seq)]
-        random.shuffle(comp_seqs1)
-        comp_seqs1 = comp_seqs1[:10000]
 
-        comp_seqs2 = [seq for seq in itertools.product((ACTION_VERBS | COMPOSITIONAL2_VERBS).keys(), repeat=max_verbs) if
-                      any(v in COMPOSITIONAL2_VERBS.keys() for v in seq)]
-        random.shuffle(comp_seqs2)
-        comp_seqs2 = comp_seqs2[:10000]
+        # splits = int(splits[0] * len(base_sequences)), int(sum(splits[:2]) * len(base_sequences))
+        # Compositional sequences. Sequences that include at least one unseen verb
+        # comp_seqs1 = [seq for seq in itertools.product((ACTION_VERBS | COMPOSITIONAL_VERBS).keys(), repeat=max_verbs) if
+        #              any(v in COMPOSITIONAL1_VERBS.keys() for v in seq)]
+        # random.shuffle(comp_seqs1)
+        # comp_seqs1 = comp_seqs1[:10000]
+
+        # comp_seqs = [seq for seq in itertools.product((ACTION_VERBS | COMPOSITIONAL_VERBS).keys(), repeat=max_verbs) if
+        #               any(v in COMPOSITIONAL_VERBS.keys() for v in seq)]
+        # random.shuffle(comp_seqs)
+        # comp_seqs = comp_seqs[:10000]
         # Length sequences
         # longer_seqs = list(itertools.product(ACTION_VERBS.keys(), repeat=max_verbs + 1))
         # random.shuffle(longer_seqs)
         # longer_seqs = longer_seqs[:10000]
-        self.splits = {'train': base_sequences[:splits[0]],
-                       'val': base_sequences[splits[0]:splits[1]],
-                       'test': base_sequences[splits[1]:],
-                       'compositional1': comp_seqs1,
-                       'compositional2': comp_seqs2, }
-                       # 'length': longer_seqs}
+        pretrain_size, train_size, val_size, test_size = 12500, 125, 250, 250
+        self.splits = {'pretrain': base_sequences[:pretrain_size],
+                       'train': base_sequences[pretrain_size:pretrain_size + train_size],
+                       'val': base_sequences[pretrain_size + train_size:pretrain_size + train_size + val_size],
+                       'test': base_sequences[pretrain_size + train_size + val_size:pretrain_size + train_size + val_size + test_size], }
+        # 'compositional': comp_seqs, }
+        # 'length': longer_seqs}
 
-        self.set_split('train')
+        self.set_split('pretrain')
 
         mission_space = MissionSpace(
             mission_func=self._gen_mission,
-            ordered_placeholders=[[0, 1, 2, 3], [seq for split_seqs in self.splits.values() for seq in split_seqs]],
+            ordered_placeholders=[[0, 1, 2, 3], [seq for split_seqs in self.splits.values() for seq in split_seqs],
+                                  [True, False]],
         )
 
         super().__init__(
@@ -147,25 +150,29 @@ class DirectionsDataset(MiniGridEnv):
         random.shuffle(self.splits[self.curr_split])
 
     @staticmethod
-    def _gen_mission(starting_dir: int, sequence: str):
+    def _gen_mission(starting_dir: int, sequence: str, inc_question=False):
         mission = f'You are facing {DIRECTIONS_IDX_TO_STR[starting_dir]}'
         for i, verb in enumerate(sequence):
             if i == 0:
                 mission += f'. They {verb}'
             else:
                 mission += f', then they {verb}'
-        mission += '. You are now facing <mask>.'
+        if inc_question:
+            mission += '. You are now facing <mask>.'
         return mission
 
     def get_obs(self):
         if self.obs_type == 'simple':
             obs = np.eye(4)[self.agent_dir].tolist()
         elif self.obs_type == 'image':
-            obs = self.get_frame(agent_pov=True, highlight=False, tile_size=16).transpose(2, 0, 1)
+            obs = self.get_frame(agent_pov=True, highlight=False, tile_size=self.tile_size).transpose(2, 0, 1)
+            img = Image.fromarray(obs.transpose(1, 2, 0))
+            img.save(f'directions_dataset/step_{self.curr_verb_step + 1}.png')
             # img = Image.fromarray(obs)
             # img.show()
         elif self.obs_type == 'grid':
-            obs = self.gen_obs()['image']
+            # Get rid of object color and object status (only keep color)
+            obs = self.gen_obs()['image'].transpose(2, 0, 1)[0]
         else:
             raise NotImplementedError(f'{self.obs_type} is not a supporter observation type')
         return obs
@@ -195,10 +202,11 @@ class DirectionsDataset(MiniGridEnv):
         self.place_agent(top=((self.size - 1) // 2, (self.size - 1) // 2), size=(1, 1))
         self.agent_dir = self.curr_dir
 
-        self.mission = self._gen_mission(self.agent_dir, self.curr_seq)
-        self.curr_verb_step = 0
+        self.mission = self._gen_mission(self.agent_dir, self.curr_seq, inc_question=(self.curr_split != 'pretrain'))
+        self.curr_verb_step = -1
         self.curr_action_step = 0
         self.traj_obss = [self.get_obs()]
+        self.curr_verb_step = 0
         self.traj_actions = []
 
     def base_step(self, action):
@@ -331,9 +339,21 @@ if __name__ == "__main__":
         env = RGBImgPartialObsWrapper(env, env.tile_size)
         env = ImgObsWrapper(env)
 
+    print('STARTING')
+    env.reset(seed=args.seed)
+    done = False
+    while not done:
+        _, _, done, _, _ = env.step(None)
+    mission, obss, actions, answer = env.get_trajectory_info()
+    #
+    # print(mission)
+    # print(answer)
+    #
+    # exit(0)
+
     window = Window("minigrid - " + str(env.__class__))
 
-    data_dir = Path(args.base_dir / 'directions_dataset' / f'hier_{env.obs_type}_{env.max_verbs}verbs')
+    data_dir = Path(args.base_dir / 'directions_dataset' / f'{env.obs_type}_{env.max_verbs}verbs')
     data_dir.mkdir(parents=True, exist_ok=True)
     if env.obs_type == 'image':
         obs_shape = (3, env.tile_size * env.size, env.tile_size * env.size)
@@ -351,7 +371,7 @@ if __name__ == "__main__":
 
     metadata['memmap_shape'] = (memmap_max_obs, *obs_shape)
     metadata['memmap_type'] = obs_type
-    for split in env.splits: # 'val'
+    for split in env.splits:  # 'val'
         with open(data_dir / f'{split}_dataset.txt', 'w') as dataset_file:
             offsets = [0]
             curr_observation_file_idx = 1

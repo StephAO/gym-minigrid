@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import itertools
 import numpy as np
 import os
@@ -25,7 +26,7 @@ ACTION_VERBS = ['pick up the <c1> block and put it on the <c2> block',
                 'grab the <c1> block and place it on the <c2> block',
                 ]
 
-ALL_COLORS = ['red', 'green', 'blue', 'yellow', 'white', 'purple']
+ALL_COLORS = ['red', 'green', 'blue', 'yellow', 'white', 'cyan', 'purple']
 # C1_COLORS = ['red', 'green', 'blue']
 
 class BlocksDataset(MiniGridEnv):
@@ -34,8 +35,8 @@ class BlocksDataset(MiniGridEnv):
     named using an English text string
     """
 
-    def __init__(self, size=6, max_verbs=2, max_blocks=4, obs_type='grid', **kwargs):
-        self.size = size
+    def __init__(self, max_verbs=2, max_blocks=4, obs_type='grid', **kwargs):
+        self.size = max_blocks + 2
         self.max_verbs = max_verbs
         self.max_blocks = max_blocks
         self.obs_type = obs_type
@@ -43,7 +44,7 @@ class BlocksDataset(MiniGridEnv):
 
         self.render_mode = "human"
 
-        self.splits = {'train': 40000, 'val': 5000, 'test': 5000}
+        self.splits = {'train': 45000, 'val': 5000, 'test': 5000, 'compositional': 5000}
         self.set_split('train')
         self.class_distributions = {k: {} for k in self.splits.keys()}
 
@@ -75,8 +76,8 @@ class BlocksDataset(MiniGridEnv):
 
         super().__init__(
             mission_space=mission_space,
-            width=size,
-            height=size,
+            width=self.size,
+            height=self.size,
             highlight=False,
             # Set this to True for maximum speed
             see_through_walls=True,
@@ -103,19 +104,21 @@ class BlocksDataset(MiniGridEnv):
 
     def env_pos_to_human_pos(self, pos):
         x, y = pos
-        return (x, self.size - y - 1)
+        return (x - 1, self.size - y - 2)
 
     def get_obs(self):
         if self.obs_type == 'simple':
             obs = np.zeros((self.size, self.size))
-            obs[self.env_pos_to_human_pos(self.block_pos[self.question_block])] = 1
+            obs[self.get_height_of_stack_in_col(self.block_pos[self.question_block])] = 1
             obs = obs.tolist()
         elif self.obs_type == 'image':
-            obs = self.grid.render(16, (-1, -1)).transpose(2, 0, 1)
+            obs = self.grid.render(64, (-1, -1)).transpose(2, 0, 1)
             img = Image.fromarray(obs.transpose(1, 2, 0))
             img.save(f'blocks_dataset/step_{self.step_count}.png')
         elif self.obs_type == 'grid':
             obs = self.grid.encode()
+            # Get rid of walls, get rid of object type and object status (only keep color)
+            obs = obs[1:-1, 1:-1, 1]
         else:
             raise NotImplementedError(f'{self.obs_type} is not a supporter observation type')
         return obs
@@ -130,15 +133,19 @@ class BlocksDataset(MiniGridEnv):
         self.grid.wall_rect(0, 0, width, height)
 
         # Get starting blocks
-        self.starting_blocks = np.random.choice(ALL_COLORS, 4, replace=False)
+        self.starting_blocks = np.random.choice(ALL_COLORS, self.max_blocks, replace=False)
+        if self.curr_split == 'compositional':
+            rand_idxs = np.random.choice(self.max_blocks, 2, replace=False)
+            if ALL_COLORS[-1] not in self.starting_blocks:
+                self.starting_blocks[rand_idxs[0]] = ALL_COLORS[-1]
+            if ALL_COLORS[-2] not in self.starting_blocks:
+                self.starting_blocks[rand_idxs[1]] = ALL_COLORS[-2]
 
         self.block_pos = {}
-        self.pos_block = {}
         # Set up blocks
         for i, color in enumerate(self.starting_blocks):
             self.put_obj(Block(color), i + 1, self.height - 2)
             self.block_pos[color] = (i + 1, self.height - 2)
-            self.pos_block[(i + 1, self.height - 2)] = color
 
         # self.mission = self._gen_mission(self.agent_dir, self.curr_seq)
         self.curr_gripper_pos = (0, 0)
@@ -146,13 +153,20 @@ class BlocksDataset(MiniGridEnv):
         self.curr_verb_step = 0
         self.step_count = 0
         self.mission = ('A ' + ' '.join([f'{c} block,' for c in self.starting_blocks[:-1]]) +
-                        f' and a {self.starting_blocks[-1]} all start on a table.')
-        if self.curr_split == 'train':
-            self.question_block = np.random.choice(self.starting_blocks[:-2])
-        elif self.curr_split == 'val':
-            self.question_block = self.starting_blocks[-2]
-        elif self.curr_split == 'test':
-            self.question_block = self.starting_blocks[-1]
+                        f' and a {self.starting_blocks[-1]} block all start on a table.')
+        if self.curr_split in ['train', 'test', 'val']:
+            sbs = copy.deepcopy(self.starting_blocks.tolist())
+            if ALL_COLORS[-1] in self.starting_blocks:
+                sbs.remove(ALL_COLORS[-1])
+            if ALL_COLORS[-2] in self.starting_blocks:
+                sbs.remove(ALL_COLORS[-2])
+            self.question_blocks = np.random.choice(sbs, size=2, replace=False)
+        elif self.curr_split == 'compositional':
+            comp_block = np.random.choice([c for c in ALL_COLORS[:-2] if c in self.starting_blocks])
+            sbs = copy.deepcopy(self.starting_blocks.tolist())
+            sbs.remove(comp_block)
+            self.question_blocks = [comp_block, np.random.choice(sbs)]
+            np.random.shuffle(self.question_blocks)
         else:
             raise ValueError(f'Invalid split: {self.curr_split}')
         self.traj_obss = [self.get_obs()]
@@ -177,7 +191,6 @@ class BlocksDataset(MiniGridEnv):
                 blocks.append(block)
                 # Remove block from previous position
                 self.grid.set(x, y, None)
-                del self.pos_block[(x, y)]
                 y -= 1
                 block = self.grid.get(x, y)
 
@@ -186,7 +199,6 @@ class BlocksDataset(MiniGridEnv):
                 # Set block to new position
                 self.grid.set(new_x, new_y, block)
                 self.block_pos[block.color] = (new_x, new_y)
-                self.pos_block[(new_x, new_y)] = block.color
                 new_y -= 1
             self.curr_gripper_pos = action
         else:
@@ -194,6 +206,16 @@ class BlocksDataset(MiniGridEnv):
 
         if self.render_mode == "human":
             self.render()
+
+    def get_height_of_stack_in_col(self, col):
+        y, height = self.height - 2, 0
+
+        block = self.grid.get(col, y)
+        while isinstance(block, Block):
+            height += 1
+            y -= 1
+            block = self.grid.get(col, y)
+        return height
 
     def step(self, _):
         # Get valid block to stack and valid block to stack it onto
@@ -214,36 +236,47 @@ class BlocksDataset(MiniGridEnv):
             else:
                 end_positions.append(pos)
 
-        end_pos_i = np.random.choice(len(end_positions))
-        # End position row should be one higher than block it will be stacked on
-        end_pos = (end_positions[end_pos_i][0], end_positions[end_pos_i][1] - 1)
+        if len(end_positions) != 0:
+            end_pos_i = np.random.choice(len(end_positions))
+            # End position row should be one higher than block it will be stacked on
+            end_pos = (end_positions[end_pos_i][0], end_positions[end_pos_i][1] - 1)
 
-        c1, c2 = [self.grid.get(*start_pos).color, self.grid.get(end_pos[0], end_pos[1] + 1).color]
+            c1, c2 = [self.grid.get(*start_pos).color, self.grid.get(end_pos[0], end_pos[1] + 1).color]
 
-        # Move gripper to start pos, grab, move gripper to end pos, let go
-        prev_action = None
-        for action in [start_pos, 'grab', end_pos, 'letgo']:
-            self.base_step(action)
-            if isinstance(action, str):
-                self.traj_obss.append(self.get_obs())
-                a_pos = self.env_pos_to_human_pos(prev_action)
-                action_idx = a_pos[0] * self.size + a_pos[1]
-                if self.is_grabbing_block:
-                    action_idx += self.size * self.size
-                self.traj_actions.append(action_idx)
-            prev_action = action
+            # Move gripper to start pos, grab, move gripper to end pos, let go
+            for action in [start_pos, 'grab', end_pos, 'letgo']:
+                self.base_step(action)
 
-        self.curr_verb_step += 1
-        rand_verb_phrase = np.random.choice(ACTION_VERBS)
-        rand_verb_phrase = rand_verb_phrase.replace('<c1>', c1).replace('<c2>', c2)
-        if self.curr_verb_step == 1:
-            self.mission += f' You ' + rand_verb_phrase
-        else:
-            self.mission += f', then you {rand_verb_phrase}'
+            # h_start_pos, h_end_pos = self.env_pos_to_human_pos(start_pos), self.env_pos_to_human_pos(end_pos)
+            action_repr = np.zeros((self.size - 2, self.size - 2), dtype=int)
+            action_repr[start_pos[0] - 1, start_pos[1] - 1] = 1
+            action_repr[end_pos[0] - 1, end_pos[1] - 1] = 2
+            self.traj_actions.append(action_repr.flatten().tolist())
+            self.traj_obss.append(self.get_obs())
 
-        if self.curr_verb_step == self.max_verbs:
-            self.mission += f'. The {self.question_block} block is at a height of <mask>.'
-            self.answer = INT_TO_WORD[self.size - self.block_pos[self.question_block][1] - 1]
+            self.curr_verb_step += 1
+            rand_verb_phrase = np.random.choice(ACTION_VERBS)
+            rand_verb_phrase = rand_verb_phrase.replace('<c1>', c1).replace('<c2>', c2)
+            if self.curr_verb_step == 1:
+                self.mission += f' You ' + rand_verb_phrase
+            else:
+                self.mission += f', then you {rand_verb_phrase}'
+
+        if self.curr_verb_step == self.max_verbs or len(end_positions) == 0:
+            # superlative = 'tallest' if np.random.random() < 0.5 else 'shortest'
+            # self.mission += f'. The {superlative} stack has <mask> blocks.'
+            # col_heights = [self.get_height_of_stack_in_col(c) for c in range(1, self.width - 1)]
+            # col_heights = [h for h in col_heights if h > 0]
+            # self.answer = INT_TO_WORD[max(col_heights) if superlative == 'tallest' else min(col_heights)]
+            heights = [(self.height - 1 - self.block_pos[qb][1]) for qb in self.question_blocks]
+            self.mission += f'. Relative to the {self.question_blocks[1]} block, the {self.question_blocks[0]} block is <mask>.'
+            if heights[0] > heights[1]:
+                self.answer = 'higher'
+            elif heights[0] < heights[1]:
+                self.answer = 'lower'
+            else:
+                # ==
+                self.answer = 'level'
             self.class_distributions[self.curr_split][self.answer] = self.class_distributions[self.curr_split].get(self.answer, 0) + 1
             return {'direction': np.array([]), 'image': np.array([]), 'mission': ''}, 0, True, False, {}
         else:
@@ -318,32 +351,32 @@ if __name__ == "__main__":
         env = RGBImgPartialObsWrapper(env, env.tile_size)
         env = ImgObsWrapper(env)
 
-    # print('STARTING')
-    # env.reset(seed=args.seed)
-    # done = False
-    # while not done:
-    #     _, _, done, _, _ = env.step(None)
-    # mission, obss, actions, answer = env.get_trajectory_info()
-    #
-    # # print(mission)
-    # # print(answer)
-    # #
-    # # exit(0)
+    print('STARTING')
+    env.reset(seed=args.seed)
+    done = False
+    while not done:
+        _, _, done, _, _ = env.step(None)
+    mission, obss, actions, answer = env.get_trajectory_info()
+
+    print(mission)
+    print(answer)
+
+    exit(0)
     #
     # # env = FullyObsWrapper(env)
 
     window = Window("minigrid - " + str(env.__class__))
 
-    data_dir = Path(args.base_dir / 'blocks_dataset' / f'{env.obs_type}_{env.max_verbs}verbs')
+    data_dir = Path(args.base_dir / 'blocks_dataset' / 'data' / f'{env.obs_type}_{env.max_verbs}verbs')
     data_dir.mkdir(parents=True, exist_ok=True)
     if env.obs_type == 'image':
         obs_shape = (3, env.tile_size * env.size, env.tile_size * env.size)
         obs_type = 'float32'
     elif env.obs_type == 'grid':
-        obs_shape = (env.size, env.size, 3)
+        obs_shape = (env.size - 2, env.size - 2)
         obs_type = 'int'
     elif env.obs_type == 'simple':
-        obs_shape = (env.size, env.size)
+        obs_shape = (2)
         obs_type = 'int'
     else:
         obs_shape, obs_type = None, None
@@ -375,12 +408,7 @@ if __name__ == "__main__":
                 # if env.obs_type != 'image':
                 #     print(obss[0])
                 # for i in range(len(actions)):
-                #     prefix = 'empty'
-                #     if actions[i] > env.size ** 2:
-                #         prefix = 'gripped'
-                #         actions[i] = actions[i] - env.size ** 2
-                #     x, y = actions[i] // env.size, actions[i] % env.size
-                #     print(x, y)
+                #     print(actions[i])
                 #     if env.obs_type != 'image':
                 #         print(obss[i + 1])
                 # print(answer)
