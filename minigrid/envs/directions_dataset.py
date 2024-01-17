@@ -58,7 +58,7 @@ HL_ACTION_VERBS = {'turn left': [DDActions.left], 'turn right': [DDActions.right
 
                    'turn 90 degrees counterclockwise': [DDActions.left],
                    'turn 180 degrees counterclockwise': [DDActions.turn_around],
-                   'turn 270 degrees counterclockwise': [DDActions.right],
+                   # 'turn 270 degrees counterclockwise': [DDActions.right],
                    'turn 360 degrees counterclockwise': [DDActions.stay],
 
                    # 'rotate 180 degrees counterclockwise': [DDActions.turn_around],
@@ -87,47 +87,48 @@ class DirectionsDataset(MiniGridEnv):
     named using an English text string
     """
 
-    def __init__(self, size=3, max_verbs=2, splits=(0.8, 0.1, 0.1), obs_type='grid', **kwargs):
+    def __init__(self, size=3, max_verbs=2, obs_type='grid', pretrain_version=True, **kwargs):
         self.size = size
         self.max_verbs = max_verbs
         self.obs_type = obs_type
         self.tile_size = 16
+        self.pretrain_version = pretrain_version
 
         # Base sequences
         # base_sequences = []
         # for i in range(max_verbs + 1):
+        pretrain_sequences = list(itertools.product((ACTION_VERBS | COMPOSITIONAL_VERBS).keys(), repeat=max_verbs))
+        random.shuffle(pretrain_sequences)
+
         base_sequences = list(itertools.product(ACTION_VERBS.keys(), repeat=max_verbs))
         random.shuffle(base_sequences)
 
-        # splits = int(splits[0] * len(base_sequences)), int(sum(splits[:2]) * len(base_sequences))
-        # Compositional sequences. Sequences that include at least one unseen verb
-        # comp_seqs1 = [seq for seq in itertools.product((ACTION_VERBS | COMPOSITIONAL_VERBS).keys(), repeat=max_verbs) if
-        #              any(v in COMPOSITIONAL1_VERBS.keys() for v in seq)]
-        # random.shuffle(comp_seqs1)
-        # comp_seqs1 = comp_seqs1[:10000]
-
-        # comp_seqs = [seq for seq in itertools.product((ACTION_VERBS | COMPOSITIONAL_VERBS).keys(), repeat=max_verbs) if
-        #               any(v in COMPOSITIONAL_VERBS.keys() for v in seq)]
-        # random.shuffle(comp_seqs)
-        # comp_seqs = comp_seqs[:10000]
+        comp_seqs = [seq for seq in itertools.product((ACTION_VERBS | COMPOSITIONAL_VERBS).keys(), repeat=max_verbs) if
+                      any(v in COMPOSITIONAL_VERBS.keys() for v in seq)]
+        random.shuffle(comp_seqs)
+        comp_seqs = comp_seqs[:250]
         # Length sequences
         # longer_seqs = list(itertools.product(ACTION_VERBS.keys(), repeat=max_verbs + 1))
         # random.shuffle(longer_seqs)
         # longer_seqs = longer_seqs[:10000]
-        pretrain_size, train_size, val_size, test_size = 12500, 125, 250, 250
-        self.splits = {'pretrain': base_sequences[:pretrain_size],
-                       'train': base_sequences[pretrain_size:pretrain_size + train_size],
-                       'val': base_sequences[pretrain_size + train_size:pretrain_size + train_size + val_size],
-                       'test': base_sequences[pretrain_size + train_size + val_size:pretrain_size + train_size + val_size + test_size], }
-        # 'compositional': comp_seqs, }
-        # 'length': longer_seqs}
-
-        self.set_split('pretrain')
+        if pretrain_version:
+            pretrain_size, pretrain_val_size, train_size, val_size, test_size = 25000, 125, 50, 250, 2500
+        else:
+            train_size, val_size, test_size = 25000, 2500, 2500
+        self.splits = {'train': base_sequences[:train_size],
+                       'val': base_sequences[train_size:train_size + val_size],
+                       'test': base_sequences[train_size + val_size:train_size + val_size + test_size],
+                       'compositional': comp_seqs}
+        if pretrain_version:
+            self.splits['pretrain_val'] = pretrain_sequences[:pretrain_val_size]
+            self.splits['pretrain'] = pretrain_sequences[pretrain_val_size:pretrain_val_size + pretrain_size]
+            self.set_split('pretrain')
+        else:
+            self.set_split('train')
 
         mission_space = MissionSpace(
             mission_func=self._gen_mission,
-            ordered_placeholders=[[0, 1, 2, 3], [seq for split_seqs in self.splits.values() for seq in split_seqs],
-                                  [True, False]],
+            ordered_placeholders=[[0, 1, 2, 3], [seq for seq in self.splits['train']], [True, False]],
         )
 
         super().__init__(
@@ -150,15 +151,17 @@ class DirectionsDataset(MiniGridEnv):
         random.shuffle(self.splits[self.curr_split])
 
     @staticmethod
-    def _gen_mission(starting_dir: int, sequence: str, inc_question=False):
-        mission = f'You are facing {DIRECTIONS_IDX_TO_STR[starting_dir]}'
+    def _gen_mission(starting_dir: int, sequence: str, inc_question: bool=False):
+        mission = f'The robot is facing {DIRECTIONS_IDX_TO_STR[starting_dir]}'
         for i, verb in enumerate(sequence):
             if i == 0:
                 mission += f'. They {verb}'
             else:
                 mission += f', then they {verb}'
-        if inc_question:
-            mission += '. You are now facing <mask>.'
+        # if inc_question:
+        #     mission += '. You are now facing <mask>.'
+        # else:
+        mission += '. The robot is now facing>'
         return mission
 
     def get_obs(self):
@@ -202,7 +205,7 @@ class DirectionsDataset(MiniGridEnv):
         self.place_agent(top=((self.size - 1) // 2, (self.size - 1) // 2), size=(1, 1))
         self.agent_dir = self.curr_dir
 
-        self.mission = self._gen_mission(self.agent_dir, self.curr_seq, inc_question=(self.curr_split != 'pretrain'))
+        self.mission = self._gen_mission(self.agent_dir, self.curr_seq, inc_question=self.curr_split != 'pretrain')
         self.curr_verb_step = -1
         self.curr_action_step = 0
         self.traj_obss = [self.get_obs()]
@@ -269,7 +272,7 @@ class DirectionsDataset(MiniGridEnv):
             self.curr_verb_step += 1
             if self.curr_verb_step >= len(self.curr_seq):
                 terminated = True
-                self.answer = f'{DIRECTIONS_IDX_TO_STR[self.agent_dir]}'
+                self.answer = f' {DIRECTIONS_IDX_TO_STR[self.agent_dir]}'
 
         return obs, reward, terminated, truncated, info
 
@@ -323,13 +326,20 @@ if __name__ == "__main__":
         help="draw the agent sees (partially observable view)",
         action="store_true",
     )
+    parser.add_argument(
+        "--pretrain",
+        default=False,
+        help="draw the agent sees (partially observable view)",
+        action="store_true",
+    )
     parser.add_argument('--base-dir', type=str, default=Path.cwd(),
                         help='Base directory to save dataset to.')
 
     args = parser.parse_args()
     args.base_dir = Path(args.base_dir)
 
-    env: MiniGridEnv = gym.make(args.env, max_verbs=args.max_verbs, obs_type=args.obs_type, tile_size=args.tile_size)
+    env: MiniGridEnv = gym.make(args.env, max_verbs=args.max_verbs, obs_type=args.obs_type, tile_size=args.tile_size,
+                                pretrain_version=args.pretrain)
     metadata = {'obs_type': env.obs_type, 'max_verbs': env.max_verbs, 'split_sizes': {}}
 
     # env = FullyObsWrapper(env)
@@ -353,7 +363,10 @@ if __name__ == "__main__":
 
     window = Window("minigrid - " + str(env.__class__))
 
-    data_dir = Path(args.base_dir / 'directions_dataset' / f'{env.obs_type}_{env.max_verbs}verbs')
+    dataset_name = f'{env.obs_type}_{env.max_verbs}verbs'
+    if args.pretrain:
+        dataset_name += '_pretrain'
+    data_dir = Path(args.base_dir / 'directions_dataset' / 'data' / dataset_name)
     data_dir.mkdir(parents=True, exist_ok=True)
     if env.obs_type == 'image':
         obs_shape = (3, env.tile_size * env.size, env.tile_size * env.size)
