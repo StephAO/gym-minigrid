@@ -112,7 +112,7 @@ class DirectionsDataset(MiniGridEnv):
         # random.shuffle(longer_seqs)
         # longer_seqs = longer_seqs[:10000]
         if pretrain_version:
-            pretrain_size, pretrain_val_size, train_size, val_size, test_size = 25000, 125, 50, 250, 2500
+            pretrain_size, pretrain_val_size, train_size, val_size, test_size = 25000, 125, 25000, 250, 2500
         else:
             train_size, val_size, test_size = 25000, 2500, 2500
         self.splits = {'train': base_sequences[:train_size],
@@ -161,7 +161,7 @@ class DirectionsDataset(MiniGridEnv):
         # if inc_question:
         #     mission += '. You are now facing <mask>.'
         # else:
-        mission += '. The robot is now facing>'
+        mission += '.>'
         return mission
 
     def get_obs(self):
@@ -266,13 +266,13 @@ class DirectionsDataset(MiniGridEnv):
         self.curr_action_step += 1
         if len(self.curr_seq) == 0:
             terminated = True
-            self.answer = f'{DIRECTIONS_IDX_TO_STR[self.agent_dir]}'
+            self.answer = f'The robot is now facing {DIRECTIONS_IDX_TO_STR[self.agent_dir]}'
         elif self.curr_action_step >= len(ALL_VERBS[curr_verb]):
             self.curr_action_step = 0
             self.curr_verb_step += 1
             if self.curr_verb_step >= len(self.curr_seq):
                 terminated = True
-                self.answer = f' {DIRECTIONS_IDX_TO_STR[self.agent_dir]}'
+                self.answer = f'The robot is now facing {DIRECTIONS_IDX_TO_STR[self.agent_dir]}'
 
         return obs, reward, terminated, truncated, info
 

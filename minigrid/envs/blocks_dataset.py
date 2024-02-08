@@ -47,7 +47,7 @@ class BlocksDataset(MiniGridEnv):
         self.render_mode = "human"
 
         if pretrain_version:
-            self.splits = {'pretrain': 50000, 'train': 500, 'val': 1000, 'test': 1000}#, 'compositional': 1000}
+            self.splits = {'pretrain': 50000, 'pretrain_val': 1000, 'train': 500, 'val': 1000, 'test': 1000}#, 'compositional': 1000}
             self.set_split('pretrain')
         else:
             self.splits = {'train': 50000, 'val': 1000, 'test': 1000}
@@ -139,7 +139,7 @@ class BlocksDataset(MiniGridEnv):
         self.mission = ('A ' + ' '.join([f'{c},' for c in self.starting_blocks[:-1]]) +
                         f' and a {self.starting_blocks[-1]} block start on a table.')
 
-        if self.curr_split == 'pretrain':
+        if self.curr_split in ['pretrain', 'pretrain_val']:
             self.question_blocks = np.random.choice(self.starting_blocks, size=2, replace=False)
         elif self.curr_split in ['train', 'test', 'val']:
             # sbs = copy.deepcopy(self.starting_blocks.tolist())
@@ -250,20 +250,27 @@ class BlocksDataset(MiniGridEnv):
 
         if (self.curr_verb_step == self.max_verbs or len(end_positions) == 0):
             self.traj_obss.append(self.get_obs())
-            if self.curr_split == 'pretrain':
-                self.mission += '.'
+            if self.curr_split in ['pretrain', 'pretrain_val']:
                 self.answer = ''
+                self.mission += '.>'
             else:
-                q_fn = np.random.choice(self.question_fns)
-                q_fn()
+                self.absolute_position_question()
+                # q_fn = np.random.choice(self.question_fns)
+                # q_fn()
             self.class_distributions[self.curr_split][self.answer] = self.class_distributions[self.curr_split].get(self.answer, 0) + 1
             return {'direction': np.array([]), 'image': np.array([]), 'mission': ''}, 0, True, False, {}
         else:
             return {'direction': np.array([]), 'image': np.array([]), 'mission': ''}, 0, False, False, {}
 
+    def absolute_position_question(self):
+        x, y = self.block_pos[self.question_blocks[0]]
+        self.mission += f'. The {self.question_blocks[0]} is now>'
+        self.answer = f'in row {y} and col {x}'
+        return
+
     def rel_q_relative_height(self):
         heights = [(self.height - 1 - self.block_pos[qb][1]) for qb in self.question_blocks]
-        self.mission += f'. Relative to the {self.question_blocks[1]} block, the {self.question_blocks[0]} block is now|>'
+        self.mission += f'. Relative to the {self.question_blocks[1]} block, the {self.question_blocks[0]} block is now'
         if heights[0] > heights[1]:
             self.answer = 'higher'
         elif heights[0] < heights[1]:
@@ -274,7 +281,7 @@ class BlocksDataset(MiniGridEnv):
     def rel_q_tower_height(self):
         tower_heights = self.get_height_of_stack_in_col(self.block_pos[self.question_blocks[0]][0])
         self.answer = INT_TO_WORD[tower_heights]
-        self.mission += f'. The tower containing the {self.question_blocks[0]} block has a height of|>'
+        self.mission += f'. The tower containing the {self.question_blocks[0]} block has a height of'
 
     def rel_q_number_of_blocks_touching(self):
         x, y = self.block_pos[self.question_blocks[0]]
@@ -284,7 +291,7 @@ class BlocksDataset(MiniGridEnv):
             if isinstance(block, Block):
                 answer += 1
         self.answer = INT_TO_WORD[answer]
-        self.mission += f'. The number of blocks that the {self.question_blocks[0]} block is touching is|>'
+        self.mission += f'. The number of blocks that the {self.question_blocks[0]} block is touching is'
 
     # TODO Add question along the lines of "The red block is in row <mask> and col <mask>.
     # def rel_q_number_of_blocks_touching(self):
