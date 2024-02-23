@@ -96,7 +96,7 @@ class DirectionsDataset(MiniGridEnv):
 
         # Base sequences
         # base_sequences = []
-        # for i in range(max_verbs + 1):
+        # for i in range(max_actions + 1):
         pretrain_sequences = list(itertools.product((ACTION_VERBS | COMPOSITIONAL_VERBS).keys(), repeat=max_verbs))
         random.shuffle(pretrain_sequences)
 
@@ -108,7 +108,7 @@ class DirectionsDataset(MiniGridEnv):
         random.shuffle(comp_seqs)
         comp_seqs = comp_seqs[:250]
         # Length sequences
-        # longer_seqs = list(itertools.product(ACTION_VERBS.keys(), repeat=max_verbs + 1))
+        # longer_seqs = list(itertools.product(ACTION_VERBS.keys(), repeat=max_actions + 1))
         # random.shuffle(longer_seqs)
         # longer_seqs = longer_seqs[:10000]
         if pretrain_version:
@@ -174,8 +174,8 @@ class DirectionsDataset(MiniGridEnv):
             # img = Image.fromarray(obs)
             # img.show()
         elif self.obs_type == 'grid':
-            # Get rid of object color and object status (only keep color)
-            obs = self.gen_obs()['image'].transpose(2, 0, 1)[0]
+            # Get rid of object color and object status (only keep object type)
+            obs = self.gen_obs()['image'].transpose(2, 0, 1)[0, ..., np.newaxis]
         else:
             raise NotImplementedError(f'{self.obs_type} is not a supporter observation type')
         return obs
@@ -340,7 +340,7 @@ if __name__ == "__main__":
 
     env: MiniGridEnv = gym.make(args.env, max_verbs=args.max_verbs, obs_type=args.obs_type, tile_size=args.tile_size,
                                 pretrain_version=args.pretrain)
-    metadata = {'obs_type': env.obs_type, 'max_verbs': env.max_verbs, 'split_sizes': {}}
+    metadata = {'obs_type': env.obs_type, 'max_actions': env.max_verbs, 'split_sizes': {}}
 
     # env = FullyObsWrapper(env)
 
@@ -372,7 +372,7 @@ if __name__ == "__main__":
         obs_shape = (3, env.tile_size * env.size, env.tile_size * env.size)
         obs_type = 'float32'
     elif env.obs_type == 'grid':
-        obs_shape = (env.size, env.size, 3)
+        obs_shape = (env.size, env.size, 1)
         obs_type = 'int'
     elif env.obs_type == 'simple':
         obs_shape = (4,)

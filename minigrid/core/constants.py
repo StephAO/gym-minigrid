@@ -22,16 +22,16 @@ COLOR_NAMES = sorted(list(COLORS.keys()))
 
 # Used to map colors to integers
 COLOR_TO_IDX = {
-    'brown' : 0,
-    'green' : 1,
-    'blue'  : 2,
-    'purple': 3,
-    'yellow': 4,
-    'grey'  : 5,
-    'white' : 6,
-    'cyan'  : 7,
-    'red'   : 8,
-    'orange': 9
+    'red'   : 1,
+    'green' : 2,
+    'blue'  : 3,
+    'purple': 4,
+    'yellow': 5,
+    'grey'  : 6,
+    'white' : 7,
+    'cyan'  : 8,
+    'brown' : 9,
+    'orange': 10
 }
 
 IDX_TO_COLOR = dict(zip(COLOR_TO_IDX.values(), COLOR_TO_IDX.keys()))
@@ -45,12 +45,17 @@ OBJECT_TO_IDX = {
     'floor'         : 3,
     'door'          : 4,
 
-    'goal'          : 5,
-    'lava'          : 6,
-    'agent'         : 7,
-    # Blocks
-    'block'         : 8,
-    'gripped_block' : 9,
+    'block'         : 5,
+    'north'         : 6,
+    'east'          : 7,
+    'south'         : 8,
+    'west'          : 9,
+
+    'agent'         : 10,
+    'goal'          : 31,
+    'lava'          : 32,
+    'gripped_block' : 33,
+
     # Shapes
     'square'        : 11,
     'circle'        : 12,
@@ -73,10 +78,7 @@ OBJECT_TO_IDX = {
     'crate'         : 28,
     'chair'         : 29,
     'flower'        : 30,
-    'north'         : 31,
-    'east'          : 32,
-    'south'         : 33,
-    'west'          : 34,
+
 }
 
 OBJECT_NAMES = sorted(list(OBJECT_TO_IDX.keys()))
