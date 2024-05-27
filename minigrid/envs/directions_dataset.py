@@ -58,7 +58,7 @@ HL_ACTION_VERBS = {'turn left': [DDActions.left], 'turn right': [DDActions.right
 
                    'turn 90 degrees counterclockwise': [DDActions.left],
                    'turn 180 degrees counterclockwise': [DDActions.turn_around],
-                   # 'turn 270 degrees counterclockwise': [DDActions.right],
+                   'turn 270 degrees counterclockwise': [DDActions.right],
                    'turn 360 degrees counterclockwise': [DDActions.stay],
 
                    # 'rotate 180 degrees counterclockwise': [DDActions.turn_around],
@@ -66,17 +66,6 @@ HL_ACTION_VERBS = {'turn left': [DDActions.left], 'turn right': [DDActions.right
                    }
 
 ACTION_VERBS = HL_ACTION_VERBS if USE_HIGH_LEVEL_ACTIONS else LL_ACTION_VERBS
-
-# COMPOSITIONAL1_VERBS = {
-#                 'rotate 90 degrees counterclockwise': [DDActions.left],
-#                 'spin 90 degrees counterclockwise': [DDActions.left],
-# }
-
-COMPOSITIONAL_VERBS = {
-    'turn 270 degrees counterclockwise': [DDActions.right],
-}
-
-ALL_VERBS = ACTION_VERBS | COMPOSITIONAL_VERBS
 
 DIRECTIONS_IDX_TO_STR = ['east', 'south', 'west', 'north']
 
@@ -94,41 +83,39 @@ class DirectionsDataset(MiniGridEnv):
         self.tile_size = 16
         self.pretrain_version = pretrain_version
 
+        train_size, val_size, test_size, length3_size, lengthp1_size = 131072, 1024, 1000, 1000, 1000
+
         # Base sequences
-        # base_sequences = []
-        # for i in range(max_actions + 1):
-        pretrain_sequences = list(itertools.product((ACTION_VERBS | COMPOSITIONAL_VERBS).keys(), repeat=max_verbs))
+        pretrain_sequences = []
+        for i in range(1, max_verbs + 1):
+            if i != 3:
+                pretrain_sequences += list(itertools.product(ACTION_VERBS.keys(), repeat=max_verbs))
         random.shuffle(pretrain_sequences)
 
         base_sequences = list(itertools.product(ACTION_VERBS.keys(), repeat=max_verbs))
         random.shuffle(base_sequences)
 
-        comp_seqs = [seq for seq in itertools.product((ACTION_VERBS | COMPOSITIONAL_VERBS).keys(), repeat=max_verbs) if
-                      any(v in COMPOSITIONAL_VERBS.keys() for v in seq)]
-        random.shuffle(comp_seqs)
-        comp_seqs = comp_seqs[:250]
+        length3_seqs = list(itertools.product(ACTION_VERBS.keys(), repeat=3))
+        random.shuffle(length3_seqs)
+        length3_seqs = length3_seqs[:length3_size]
+        lengthp1_seqs = list(itertools.product(ACTION_VERBS.keys(), repeat=max_verbs + 1))
+        random.shuffle(lengthp1_seqs)
+        lengthp1_seqs = lengthp1_seqs[:lengthp1_size]
         # Length sequences
         # longer_seqs = list(itertools.product(ACTION_VERBS.keys(), repeat=max_actions + 1))
         # random.shuffle(longer_seqs)
         # longer_seqs = longer_seqs[:10000]
-        if pretrain_version:
-            pretrain_size, pretrain_val_size, train_size, val_size, test_size = 25000, 125, 25000, 250, 2500
-        else:
-            train_size, val_size, test_size = 25000, 2500, 2500
+
         self.splits = {'train': base_sequences[:train_size],
                        'val': base_sequences[train_size:train_size + val_size],
                        'test': base_sequences[train_size + val_size:train_size + val_size + test_size],
-                       'compositional': comp_seqs}
-        if pretrain_version:
-            self.splits['pretrain_val'] = pretrain_sequences[:pretrain_val_size]
-            self.splits['pretrain'] = pretrain_sequences[pretrain_val_size:pretrain_val_size + pretrain_size]
-            self.set_split('pretrain')
-        else:
-            self.set_split('train')
+                       'length3': length3_seqs, 'length+1': lengthp1_seqs}
+
+        self.set_split('train')
 
         mission_space = MissionSpace(
             mission_func=self._gen_mission,
-            ordered_placeholders=[[0, 1, 2, 3], [seq for seq in self.splits['train']], [True, False]],
+            ordered_placeholders=[[0,1,2,3], [seq for seq in self.splits['train']]],
         )
 
         super().__init__(
@@ -151,17 +138,13 @@ class DirectionsDataset(MiniGridEnv):
         random.shuffle(self.splits[self.curr_split])
 
     @staticmethod
-    def _gen_mission(starting_dir: int, sequence: str, inc_question: bool=False):
-        mission = f'The robot is facing {DIRECTIONS_IDX_TO_STR[starting_dir]}'
+    def _gen_mission(starting_dir: str, sequence: str):
+        mission = f'The robot is facing {starting_dir}.'
         for i, verb in enumerate(sequence):
             if i == 0:
-                mission += f'. They {verb}'
+                mission += f' The robot {verb}.'
             else:
-                mission += f', then they {verb}'
-        # if inc_question:
-        #     mission += '. You are now facing <mask>.'
-        # else:
-        mission += '.>'
+                mission += f' Then the robot {verb}.'
         return mission
 
     def get_obs(self):
@@ -176,6 +159,16 @@ class DirectionsDataset(MiniGridEnv):
         elif self.obs_type == 'grid':
             # Get rid of object color and object status (only keep object type)
             obs = self.gen_obs()['image'].transpose(2, 0, 1)[0, ..., np.newaxis]
+
+            # TODO test one hot encoding
+            # in core/constants.py, we use world object up to idx 10
+            oh_obs = np.zeros((self.size, self.size, 10))
+            for x in range(self.size):
+                for y in range(self.size):
+                    oh_obs[x, y, obs[x, y]] = 1
+
+            obs = oh_obs
+
         else:
             raise NotImplementedError(f'{self.obs_type} is not a supporter observation type')
         return obs
@@ -193,19 +186,16 @@ class DirectionsDataset(MiniGridEnv):
         self.put_obj(WorldObj.decode(OBJECT_TO_IDX['north'], COLOR_TO_IDX['red'], 0), self.height // 2, 0)
 
         # Get next sequence
-        self.curr_dir += 1
-        if self.curr_dir == 4:
-            self.curr_dir = 0
-            self.curr_idx += 1
-            if self.curr_idx >= len(self.splits[self.curr_split]):
-                print(self.curr_idx, self.curr_split, len(self.splits[self.curr_split]))
+        if self.curr_idx >= len(self.splits[self.curr_split]):
+            print(self.curr_idx, self.curr_split, len(self.splits[self.curr_split]))
         self.curr_seq = self.splits[self.curr_split][self.curr_idx]
+        self.curr_idx += 1
 
         # Place agent in middle with next orientation
         self.place_agent(top=((self.size - 1) // 2, (self.size - 1) // 2), size=(1, 1))
-        self.agent_dir = self.curr_dir
 
-        self.mission = self._gen_mission(self.agent_dir, self.curr_seq, inc_question=self.curr_split != 'pretrain')
+        self.agent_dir = np.random.randint(len(DIRECTIONS_IDX_TO_STR))
+        self.mission = self._gen_mission(DIRECTIONS_IDX_TO_STR[self.agent_dir], self.curr_seq)
         self.curr_verb_step = -1
         self.curr_action_step = 0
         self.traj_obss = [self.get_obs()]
@@ -256,23 +246,24 @@ class DirectionsDataset(MiniGridEnv):
             action = DDActions.stay
         else:
             curr_verb = self.curr_seq[self.curr_verb_step]
-            action = ALL_VERBS[curr_verb][self.curr_action_step]
+            action = ACTION_VERBS[curr_verb][self.curr_action_step]
 
         obs, reward, terminated, truncated, info = self.base_step(action)
 
         self.traj_obss.append(self.get_obs())
-        self.traj_actions.append(action)
+        # TODO test action
+        self.traj_actions.append(int(action))
 
         self.curr_action_step += 1
         if len(self.curr_seq) == 0:
             terminated = True
-            self.answer = f'The robot is now facing {DIRECTIONS_IDX_TO_STR[self.agent_dir]}'
-        elif self.curr_action_step >= len(ALL_VERBS[curr_verb]):
+            self.answer = f'The robot is now facing {DIRECTIONS_IDX_TO_STR[self.agent_dir]}.'
+        elif self.curr_action_step >= len(ACTION_VERBS[curr_verb]):
             self.curr_action_step = 0
             self.curr_verb_step += 1
             if self.curr_verb_step >= len(self.curr_seq):
                 terminated = True
-                self.answer = f'The robot is now facing {DIRECTIONS_IDX_TO_STR[self.agent_dir]}'
+                self.answer = f'The robot is now facing {DIRECTIONS_IDX_TO_STR[self.agent_dir]}.'
 
         return obs, reward, terminated, truncated, info
 
@@ -340,7 +331,7 @@ if __name__ == "__main__":
 
     env: MiniGridEnv = gym.make(args.env, max_verbs=args.max_verbs, obs_type=args.obs_type, tile_size=args.tile_size,
                                 pretrain_version=args.pretrain)
-    metadata = {'obs_type': env.obs_type, 'max_actions': env.max_verbs, 'split_sizes': {}}
+    metadata = {'obs_type': env.obs_type, 'max_actions': env.max_verbs + 1, 'split_sizes': {}}
 
     # env = FullyObsWrapper(env)
 
@@ -350,14 +341,16 @@ if __name__ == "__main__":
         env = ImgObsWrapper(env)
 
     print('STARTING')
-    env.reset(seed=args.seed)
-    done = False
-    while not done:
-        _, _, done, _, _ = env.step(None)
-    mission, obss, actions, answer = env.get_trajectory_info()
-    #
+    # env.reset(seed=args.seed)
+    # done = False
+    # while not done:
+    #     _, _, done, _, _ = env.step(None)
+    # mission, obss, actions, answer = env.get_trajectory_info()
+
     # print(mission)
     # print(answer)
+    # print(obss)
+    # print(actions)
     #
     # exit(0)
 
@@ -372,7 +365,7 @@ if __name__ == "__main__":
         obs_shape = (3, env.tile_size * env.size, env.tile_size * env.size)
         obs_type = 'float32'
     elif env.obs_type == 'grid':
-        obs_shape = (env.size, env.size, 1)
+        obs_shape = (env.size, env.size, 10)
         obs_type = 'int'
     elif env.obs_type == 'simple':
         obs_shape = (4,)
@@ -392,7 +385,7 @@ if __name__ == "__main__":
                                                 dtype=obs_type, mode='w+', shape=(memmap_max_obs, *obs_shape))
             curr_obs_idx = 0
             env.set_split(split)
-            num_instances = 4 * len(env.splits[split])  # for each direction
+            num_instances = len(env.splits[split])  # for each direction
             print(f'creating {num_instances} for split: {split}')
             for i in tqdm(range(num_instances)):
                 env.reset(seed=args.seed)
@@ -400,7 +393,6 @@ if __name__ == "__main__":
                 while not done:
                     _, _, done, _, _ = env.step(None)
                 mission, obss, actions, answer = env.get_trajectory_info()
-                mission = mission.replace('<mask>', answer)
                 num_obss = len(obss)
                 traj_str = json.dumps((mission, curr_observation_file_idx, curr_obs_idx, num_obss, actions, answer))
                 dataset_file.write(traj_str)

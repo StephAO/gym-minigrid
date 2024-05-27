@@ -21,7 +21,7 @@ from minigrid.wrappers import ImgObsWrapper, RGBImgPartialObsWrapper
 INT_TO_WORD = {0: 'zero', 1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five', 6: 'six', 7: 'seven', 8: 'eight', 9: 'nine', 10: 'ten'}
 
 ACTION_VERBS = [
-                'stacks the <c1> block on the <c2> block',
+                'picks up the <c1> block and places it in column <c2>',
                 # 'picks up the <c1> block and puts it on the <c2> block',
                 # 'moves the <c1> block onto the <c2> block',
                 # 'grabs the <c1> block and places it on the <c2> block',
@@ -46,14 +46,9 @@ class BlocksDataset(MiniGridEnv):
         self.pretrain_version = pretrain_version
         self.render_mode = "human"
 
-        if pretrain_version:
-            # 131072
-            self.splits = {'pretrain': 131072, 'pretrain_val': 1024, 'train': 1024, 'val': 1024, 'test': 1024,
-                           'rel': 1024, 'abs': 1024, 'exact': 1024, 'compositional': 1024, 'length3': 1024, 'length+1': 1024}
-            self.set_split('pretrain')
-        else:
-            self.splits = {'train': 50000, 'val': 1000, 'test': 1000}
-            self.set_split('train')
+        self.splits = {'train': 131072, 'val': 1024, 'test': 1000, 'length3': 1000, 'length+1': 1000}
+        self.set_split('train')
+
         self.class_distributions = {k: {} for k in self.splits.keys()}
 
         mission_space = MissionSpace(mission_func=lambda : '')
@@ -68,9 +63,9 @@ class BlocksDataset(MiniGridEnv):
             max_steps=max_actions * 10,
             **kwargs,
         )
-        self.rel_question_fns = (self.rel_q_number_of_blocks_touching, self.rel_q_relative_height, self.rel_q_tower_height)
-        self.abs_question_fns = (self.abs_q_shortest_tower, self.abs_q_tallest_tower, self.abs_q_number_of_towers)
-        self.exact_question_fns = (self.exact_position_question,)
+        # self.rel_question_fns = (self.rel_q_number_of_blocks_touching, self.rel_q_relative_height, self.rel_q_tower_height)
+        # self.abs_question_fns = (self.abs_q_shortest_tower, self.abs_q_tallest_tower, self.abs_q_number_of_towers)
+        # self.exact_question_fns = (self.exact_position_question,)
 
     def set_split(self, split):
         self.curr_split = split
@@ -145,14 +140,7 @@ class BlocksDataset(MiniGridEnv):
         self.mission = ('A ' + ' '.join([f'{c},' for c in self.starting_blocks[:-1]]) +
                         f' and a {self.starting_blocks[-1]} block start on a table.')
 
-        if self.curr_split in ['pretrain', 'pretrain_val']:
-            self.question_block = np.random.choice(self.starting_blocks)
-        elif self.curr_split in ['train', 'test', 'val', 'rel', 'abs', 'exact', 'length3', 'length+1']:
-            self.question_block = np.random.choice(self.starting_blocks[:-1])
-        elif self.curr_split == 'compositional':
-            self.question_block = self.starting_blocks[-1]
-        else:
-            raise ValueError(f'Invalid split: {self.curr_split}')
+
         self.traj_obss = [self.get_obs()]
         self.traj_actions = []
 
@@ -205,119 +193,122 @@ class BlocksDataset(MiniGridEnv):
         # Get valid block to stack and valid block to stack it onto
         start_block = np.random.choice(list(self.block_pos.keys()))
         start_pos = self.block_pos[start_block]
-        end_positions = []
-        for pos in self.block_pos.values():
-            # Cant stack block onto any block in the blocks current column
-            if pos[0] == start_pos[0]:
-                continue
-            # Can only stack a block at the top of a current stack
-            for i, pos2 in enumerate(end_positions):
-                # Two blocks in the same column, only the highest one can be picked
-                if pos[0] == pos2[0]:
-                    if pos[1] < pos2[1]:
-                        end_positions[i] = pos
-                    break
-            else:
-                end_positions.append(pos)
+        # for pos in self.block_pos.values():
+        #     # Cant stack block onto any block in the blocks current column
+        #     if pos[0] == start_pos[0]:
+        #         continue
+        #     # Can only stack a block at the top of a current stack
+        #     for i, pos2 in enumerate(end_positions):
+        #         # Two blocks in the same column, only the highest one can be picked
+        #         if pos[0] == pos2[0]:
+        #             if pos[1] < pos2[1]:
+        #                 end_positions[i] = pos
+        #             break
+        #     else:
+        #         end_positions.append(pos)
+        col_probs = np.ones(self.size - 2)
+        col_probs[start_pos[0] - 1] = 0
+        col_probs = col_probs / np.sum(col_probs)
+        end_col = np.random.choice(list(range(1, self.size - 1)), p=col_probs)
+        for row in range(self.size-2, -1, -1):
+            x = self.grid.get(end_col, row)
+            if not isinstance(x, Block):
+                end_row = row
+                break
+        else:
+            raise RuntimeError(f'ERROR, no empty row, this should be impossible')
 
-        if len(end_positions) != 0:
-            end_pos_i = np.random.choice(len(end_positions))
-            # End position row should be one higher than block it will be stacked on
-            end_pos = (end_positions[end_pos_i][0], end_positions[end_pos_i][1] - 1)
+        end_pos = (end_col, end_row)
 
-            c1, c2 = [self.grid.get(*start_pos).color, self.grid.get(end_pos[0], end_pos[1] + 1).color]
+        c1, c2 = [self.grid.get(*start_pos).color, INT_TO_WORD[end_pos[0]]]#self.grid.get(end_pos[0], end_pos[1] + 1).color]
 
-            # Move gripper to start pos, grab, move gripper to end pos, let go
-            for action in [start_pos, 'grab', end_pos, 'letgo']:
-                self.base_step(action)
+        # Move gripper to start pos, grab, move gripper to end pos, let go
+        for action in [start_pos, 'grab', end_pos, 'letgo']:
+            self.base_step(action)
 
-            # Calculate actions
-            start_idx = (start_pos[0] - 1) * self.max_blocks + (start_pos[1] - 1) # value of 0 - 24
-            end_idx = (end_pos[0] - 1) * self.max_blocks + (end_pos[1] - 1) # value of 0 - 24
-            action_idx = start_idx * self.max_blocks * self.max_blocks + end_idx
-            self.traj_actions.append(action_idx)
+        # Calculate actions
+        start_idx = (start_pos[0] - 1) * self.max_blocks + (start_pos[1] - 1) # value of 0 - 24
+        end_idx = (end_pos[0] - 1) * self.max_blocks + (end_pos[1] - 1) # value of 0 - 24
+        action_idx = start_idx * self.max_blocks * self.max_blocks + end_idx
+        self.traj_actions.append(action_idx)
 
-            self.curr_step += 1
-            rand_verb_phrase = np.random.choice(ACTION_VERBS)
-            rand_verb_phrase = rand_verb_phrase.replace('<c1>', c1).replace('<c2>', c2)
-            if self.curr_step == 1:
-                self.mission += f' The robot {rand_verb_phrase}.'
-            else:
-                self.mission += f' Then the robot {rand_verb_phrase}.'
+        self.curr_step += 1
+        rand_verb_phrase = np.random.choice(ACTION_VERBS)
+        rand_verb_phrase = rand_verb_phrase.replace('<c1>', c1).replace('<c2>', c2)
+        if self.curr_step == 1:
+            self.mission += f' The robot {rand_verb_phrase}.'
+        else:
+            self.mission += f' Then the robot {rand_verb_phrase}.'
 
         self.traj_obss.append(self.get_obs())
-        if (self.curr_step == self.num_actions or len(end_positions) == 0):
+        if (self.curr_step == self.num_actions):# or len(end_positions) == 0):
             if self.curr_split in ['pretrain', 'pretrain_val']:
                 self.answer = ''
             else:
-                q_probs = {'rel': [1, 0, 0], 'abs': [0, 1, 0], 'exact': [0, 0, 1]}
-                if self.curr_split in q_probs:
-                    q_type = np.random.choice(['rel', 'abs', 'exact'], p=q_probs[self.curr_split])
-                else:
-                    q_type = np.random.choice(['rel', 'abs', 'exact'])
+                # q_probs = {'rel': [1, 0, 0], 'abs': [0, 1, 0], 'exact': [0, 0, 1]}
+                # if self.curr_split in q_probs:
+                #     q_type = np.random.choice(['rel', 'abs', 'exact'], p=q_probs[self.curr_split])
+                # else:
+                #     q_type = np.random.choice(['rel', 'abs', 'exact'])
 
-                if q_type == 'rel':
-                    np.random.choice(self.rel_question_fns)()
-                elif q_type == 'abs':
-                    np.random.choice(self.abs_question_fns)()
-                else:
-                    np.random.choice(self.exact_question_fns)()
+                # if q_type == 'rel':
+                #     np.random.choice(self.rel_question_fns)()
+                # elif q_type == 'abs':
+                #     np.random.choice(self.abs_question_fns)()
+                # else:
+                #     np.random.choice(self.exact_question_fns)()
+                self.final_state_tallest_tower()
 
             self.class_distributions[self.curr_split][self.answer] = self.class_distributions[self.curr_split].get(self.answer, 0) + 1
             return {'direction': np.array([]), 'image': np.array([]), 'mission': ''}, 0, True, False, {}
         else:
             return {'direction': np.array([]), 'image': np.array([]), 'mission': ''}, 0, False, False, {}
 
+    def final_state_old(self):
+        self.answer = ''
+        for row in range(self.size):
+            blocks = []
+            cols = []
+            for col in range(self.size):
+                x = self.grid.get(col, row)
+                if isinstance(x, Block):
+                    blocks.append( x.color )
+                    cols.append(str(col))
+
+            if len(blocks) == 1:
+                self.answer += f' At height {row}, there is the {blocks[0]} block in column {cols[0]}.'
+                # self.answer += f' Row {row} contains the {", ".join(blocks[0])} blocks.'
+            elif len(blocks) > 0:
+                self.answer += (f' At height {row}, there are the {", ".join(blocks[:-1])}, and {blocks[-1]} blocks'
+                                f' in columns {", ".join(cols[:-1])}, and {cols[-1]}.')
+
+    def final_state(self):
+        self.answer = ' The final block locations are'
+        for i, block in enumerate(self.starting_blocks):
+            x, y = self.block_pos[block]
+            self.answer += f' {block} ({x}, {y})'
+            self.answer += ',' if (i + 1) < len(self.starting_blocks) else '.'
+
+    def final_state_tallest_tower(self):
+        col_heights = [self.get_height_of_stack_in_col(c) for c in range(1, self.width - 1)]
+        # col_heights = [h for h in col_heights if h > 0]
+        tallest_col = np.argmax(col_heights) + 1
+        blocks_in_stack = []
+        for row in range(self.size-1, 0, -1):
+            x = self.grid.get(tallest_col, row)
+            if isinstance(x, Block):
+                blocks_in_stack.append(x.color)
+
+        self.answer = f' The tallest stack is in column {INT_TO_WORD[tallest_col]} and is {len(blocks_in_stack)} block(s) tall. It consists of the '
+        if len(blocks_in_stack) == 1:
+            self.answer += f'{blocks_in_stack[0]} block.'
+            # self.answer += f' Row {row} contains the {", ".join(blocks[0])} blocks.'
+        else:
+             self.answer += f'{", ".join(blocks_in_stack[:-1])}, and {blocks_in_stack[-1]} blocks.'
+
     def exact_position_question(self):
         x, y = self.block_pos[self.question_block]
-        self.mission += f' The {self.question_block} block is now>'
-        self.answer = f'in row {INT_TO_WORD[self.size - 1 - y]} and col {INT_TO_WORD[x]}'
-
-    def rel_q_relative_height(self):
-        other_block = None
-        while other_block != self.question_block:
-            other_block = np.random.choice(self.starting_blocks)
-        heights = [(self.height - 1 - self.block_pos[qb][1]) for qb in [self.question_block, other_block]]
-        self.mission += f' Relative to the {other_block} block, the {self.question_block} block is now>'
-        if heights[0] > heights[1]:
-            self.answer = ' higher'
-        elif heights[0] < heights[1]:
-            self.answer = ' lower'
-        else:  # ==
-            self.answer = ' level'
-
-    def rel_q_tower_height(self):
-        tower_height = self.get_height_of_stack_in_col(self.block_pos[self.question_block][0])
-        self.answer = f' {INT_TO_WORD[tower_height]}'
-        self.mission += f' The tower containing the {self.question_block} block now has a height of>'
-
-    def rel_q_number_of_blocks_touching(self):
-        x, y = self.block_pos[self.question_block]
-        answer = 0
-        for x_, y_ in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
-            block = self.grid.get(x + x_, y + y_)
-            if isinstance(block, Block):
-                answer += 1
-        self.answer = INT_TO_WORD[answer]
-        self.mission += f' The number of blocks that the {self.question_block} block is touching is>'
-
-    def abs_q_tallest_tower(self):
-        self.mission += f' The tallest stack has a height of>'
-        col_heights = [self.get_height_of_stack_in_col(c) for c in range(1, self.width - 1)]
-        col_heights = [h for h in col_heights if h > 0]
-        self.answer = f' {INT_TO_WORD[max(col_heights)]}'
-
-    def abs_q_shortest_tower(self):
-        self.mission += f' The shortest stack has a height of>'
-        col_heights = [self.get_height_of_stack_in_col(c) for c in range(1, self.width - 1)]
-        col_heights = [h for h in col_heights if h > 0]
-        self.answer = f' {INT_TO_WORD[max(col_heights)]}'
-
-    def abs_q_number_of_towers(self):
-        self.mission += f'. The number of distinct stacks is>'
-        col_heights = [self.get_height_of_stack_in_col(c) for c in range(1, self.width - 1)]
-        col_heights = [h for h in col_heights if h > 0]
-        self.answer = f' {INT_TO_WORD[max(col_heights)]}'
+        self.answer = f' The {self.question_block} block is now in row {INT_TO_WORD[self.size - 1 - y]} and col {INT_TO_WORD[x]}'
 
     def get_trajectory_info(self):
         return self.mission, self.traj_obss, self.traj_actions, self.answer
@@ -386,7 +377,8 @@ if __name__ == "__main__":
 
     env: MiniGridEnv = gym.make(args.env, max_actions=args.max_verbs, obs_type=args.obs_type, tile_size=args.tile_size,
                                 pretrain_version=args.pretrain)
-    metadata = {'obs_type': env.obs_type, 'max_actions': env.max_actions, 'grid_size': (env.size, env.size), 'split_sizes': {}}
+    # + 1 for length generalization
+    metadata = {'obs_type': env.obs_type, 'max_actions': env.max_actions + 1, 'grid_size': (env.size, env.size), 'split_sizes': {}}
 
     if args.agent_view:
         print("Using agent view")
@@ -395,17 +387,17 @@ if __name__ == "__main__":
 
     print('STARTING')
     ## For examples
-    # env.reset(seed=args.seed)
-    # done = False
-    # while not done:
-    #     _, _, done, _, _ = env.step(None)
-    # mission, obss, actions, answer = env.get_trajectory_info()
-    #
-    # print(mission)
+    env.reset(seed=args.seed)
+    done = False
+    while not done:
+        _, _, done, _, _ = env.step(None)
+    mission, obss, actions, answer = env.get_trajectory_info()
+
+    print(mission)
     # print(obss)
-    # print(answer)
-    #
-    # exit(0)
+    print(answer)
+
+    exit(0)
     #
     # # env = FullyObsWrapper(env)
 
@@ -428,7 +420,7 @@ if __name__ == "__main__":
     else:
         obs_shape, obs_type = None, None
 
-    memmap_max_obs = 32768
+    memmap_max_obs = 100000
 
     metadata['memmap_shape'] = (memmap_max_obs, *obs_shape)
     metadata['memmap_type'] = obs_type
@@ -450,7 +442,6 @@ if __name__ == "__main__":
                     _, _, done, _, _ = env.step(None)
                 mission, obss, actions, answer = env.get_trajectory_info()
 
-                mission = mission.replace('<mask>', answer)
                 num_obss = len(obss)
                 traj_str = json.dumps((mission, curr_observation_file_idx, curr_obs_idx, num_obss, actions, answer))
                 dataset_file.write(traj_str)
