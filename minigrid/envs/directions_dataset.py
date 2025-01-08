@@ -76,35 +76,27 @@ class DirectionsDataset(MiniGridEnv):
     named using an English text string
     """
 
-    def __init__(self, size=3, max_verbs=2, obs_type='grid', pretrain_version=True, **kwargs):
+    def __init__(self, size=3, max_actions=2, obs_type='grid', **kwargs):
         self.size = size
-        self.max_verbs = max_verbs
+        self.max_actions = max_actions
         self.obs_type = obs_type
         self.tile_size = 16
-        self.pretrain_version = pretrain_version
 
         train_size, val_size, test_size, length3_size, lengthp1_size = 131072, 1024, 1000, 1000, 1000
 
         # Base sequences
-        pretrain_sequences = []
-        for i in range(1, max_verbs + 1):
+        base_sequences = []
+        for i in range(1, max_actions + 1):
             if i != 3:
-                pretrain_sequences += list(itertools.product(ACTION_VERBS.keys(), repeat=max_verbs))
-        random.shuffle(pretrain_sequences)
-
-        base_sequences = list(itertools.product(ACTION_VERBS.keys(), repeat=max_verbs))
+                base_sequences += list(itertools.product(ACTION_VERBS.keys(), repeat=i))
         random.shuffle(base_sequences)
 
         length3_seqs = list(itertools.product(ACTION_VERBS.keys(), repeat=3))
         random.shuffle(length3_seqs)
         length3_seqs = length3_seqs[:length3_size]
-        lengthp1_seqs = list(itertools.product(ACTION_VERBS.keys(), repeat=max_verbs + 1))
+        lengthp1_seqs = list(itertools.product(ACTION_VERBS.keys(), repeat=max_actions + 1))
         random.shuffle(lengthp1_seqs)
         lengthp1_seqs = lengthp1_seqs[:lengthp1_size]
-        # Length sequences
-        # longer_seqs = list(itertools.product(ACTION_VERBS.keys(), repeat=max_actions + 1))
-        # random.shuffle(longer_seqs)
-        # longer_seqs = longer_seqs[:10000]
 
         self.splits = {'train': base_sequences[:train_size],
                        'val': base_sequences[train_size:train_size + val_size],
@@ -131,12 +123,6 @@ class DirectionsDataset(MiniGridEnv):
         )
         self.actions = DDActions
 
-    def set_split(self, split):
-        self.curr_split = split
-        self.curr_idx = -1
-        self.curr_dir = -1
-        random.shuffle(self.splits[self.curr_split])
-
     @staticmethod
     def _gen_mission(starting_dir: str, sequence: str):
         mission = f'The robot is facing {starting_dir}.'
@@ -160,7 +146,7 @@ class DirectionsDataset(MiniGridEnv):
             # Get rid of object color and object status (only keep object type)
             obs = self.gen_obs()['image'].transpose(2, 0, 1)[0, ..., np.newaxis]
 
-            # TODO test one hot encoding
+            # Encode object_type using one-hot encoding (different channel per object_type)
             # in core/constants.py, we use world object up to idx 10
             oh_obs = np.zeros((self.size, self.size, 10))
             for x in range(self.size):
@@ -168,7 +154,6 @@ class DirectionsDataset(MiniGridEnv):
                     oh_obs[x, y, obs[x, y]] = 1
 
             obs = oh_obs
-
         else:
             raise NotImplementedError(f'{self.obs_type} is not a supporter observation type')
         return obs
@@ -186,8 +171,6 @@ class DirectionsDataset(MiniGridEnv):
         self.put_obj(WorldObj.decode(OBJECT_TO_IDX['north'], COLOR_TO_IDX['red'], 0), self.height // 2, 0)
 
         # Get next sequence
-        if self.curr_idx >= len(self.splits[self.curr_split]):
-            print(self.curr_idx, self.curr_split, len(self.splits[self.curr_split]))
         self.curr_seq = self.splits[self.curr_split][self.curr_idx]
         self.curr_idx += 1
 
@@ -268,147 +251,8 @@ class DirectionsDataset(MiniGridEnv):
         return obs, reward, terminated, truncated, info
 
     def get_trajectory_info(self):
-        return self.mission, self.traj_obss, self.traj_actions, self.answer
+        return self.mission, self.traj_obss, self.traj_actions, self.answer, self.answer
 
 
-if __name__ == "__main__":
-    import argparse
-    import gymnasium as gym
-    from minigrid.utils.window import Window
-    from pathlib import Path
-    import json
 
-    gym.register(
-        id="DirectionsDataset-v0",
-        entry_point="minigrid.envs:DirectionsDataset",
-    )
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--env", help="gym environment to load", default="DirectionsDataset-v0"
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        help="random seed to generate the environment with",
-        default=None,
-    )
-    parser.add_argument(
-        "--tile-size", type=int, help="size at which to render tiles", default=16
-    )
-    parser.add_argument(
-        "--num-per-obj", type=int, help="Number of instances to create for each color/type combination", default=2
-    )
-    parser.add_argument(
-        "--obs-type",
-        type=str,
-        default="simple",
-        help="Observation type. Can be 'simple', 'grid', 'image'",
-    )
-    parser.add_argument(
-        "--max-verbs",
-        type=int,
-        default="2",
-        help="Maximum number of verbs in mission",
-    )
-    parser.add_argument(
-        "--agent-view",
-        default=False,
-        help="draw the agent sees (partially observable view)",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--pretrain",
-        default=False,
-        help="draw the agent sees (partially observable view)",
-        action="store_true",
-    )
-    parser.add_argument('--base-dir', type=str, default=Path.cwd(),
-                        help='Base directory to save dataset to.')
-
-    args = parser.parse_args()
-    args.base_dir = Path(args.base_dir)
-
-    env: MiniGridEnv = gym.make(args.env, max_verbs=args.max_verbs, obs_type=args.obs_type, tile_size=args.tile_size,
-                                pretrain_version=args.pretrain)
-    metadata = {'obs_type': env.obs_type, 'max_actions': env.max_verbs + 1, 'split_sizes': {}}
-
-    # env = FullyObsWrapper(env)
-
-    if args.agent_view:
-        print("Using agent view")
-        env = RGBImgPartialObsWrapper(env, env.tile_size)
-        env = ImgObsWrapper(env)
-
-    print('STARTING')
-    # env.reset(seed=args.seed)
-    # done = False
-    # while not done:
-    #     _, _, done, _, _ = env.step(None)
-    # mission, obss, actions, answer = env.get_trajectory_info()
-
-    # print(mission)
-    # print(answer)
-    # print(obss)
-    # print(actions)
-    #
-    # exit(0)
-
-    window = Window("minigrid - " + str(env.__class__))
-
-    dataset_name = f'{env.obs_type}_{env.max_verbs}verbs'
-    if args.pretrain:
-        dataset_name += '_pretrain'
-    data_dir = Path(args.base_dir / 'directions_dataset' / 'data' / dataset_name)
-    data_dir.mkdir(parents=True, exist_ok=True)
-    if env.obs_type == 'image':
-        obs_shape = (3, env.tile_size * env.size, env.tile_size * env.size)
-        obs_type = 'float32'
-    elif env.obs_type == 'grid':
-        obs_shape = (env.size, env.size, 10)
-        obs_type = 'int'
-    elif env.obs_type == 'simple':
-        obs_shape = (4,)
-        obs_type = 'int'
-    else:
-        obs_shape, obs_type = None, None
-
-    memmap_max_obs = 100000
-
-    metadata['memmap_shape'] = (memmap_max_obs, *obs_shape)
-    metadata['memmap_type'] = obs_type
-    for split in env.splits:  # 'val'
-        with open(data_dir / f'{split}_dataset.txt', 'w') as dataset_file:
-            offsets = [0]
-            curr_observation_file_idx = 1
-            curr_observation_memmap = np.memmap(str(data_dir / f'obss_{split}_{curr_observation_file_idx}.memmap'),
-                                                dtype=obs_type, mode='w+', shape=(memmap_max_obs, *obs_shape))
-            curr_obs_idx = 0
-            env.set_split(split)
-            num_instances = len(env.splits[split])  # for each direction
-            print(f'creating {num_instances} for split: {split}')
-            for i in tqdm(range(num_instances)):
-                env.reset(seed=args.seed)
-                done = False
-                while not done:
-                    _, _, done, _, _ = env.step(None)
-                mission, obss, actions, answer = env.get_trajectory_info()
-                num_obss = len(obss)
-                traj_str = json.dumps((mission, curr_observation_file_idx, curr_obs_idx, num_obss, actions, answer))
-                dataset_file.write(traj_str)
-                offsets.append(offsets[-1] + len(traj_str))
-                if curr_obs_idx + num_obss >= memmap_max_obs:
-                    curr_observation_file_idx += 1
-                    curr_observation_memmap = np.memmap(
-                        str(data_dir / f'obss_{split}_{curr_observation_file_idx}.memmap'), dtype=obs_type, mode='w+',
-                        shape=(memmap_max_obs, *obs_shape))
-                    curr_obs_idx = 0
-                for obs in obss:
-                    curr_observation_memmap[curr_obs_idx] = obs
-                    curr_obs_idx += 1
-        with open(data_dir / f'{split}_offset.txt', 'w') as offset_file:
-            json.dump(offsets, offset_file)
-        metadata['split_sizes'][split] = num_instances
-
-    with open(data_dir / f'metadata', 'w') as metadata_file:
-        json.dump(metadata, metadata_file)

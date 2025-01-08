@@ -37,17 +37,13 @@ class BlocksDataset(MiniGridEnv):
     named using an English text string
     """
 
-    def __init__(self, max_actions=2, max_blocks=5, obs_type='grid', pretrain_version=False, **kwargs):
+    def __init__(self, max_actions=2, max_blocks=5, obs_type='grid', **kwargs):
         self.size = max_blocks + 2
         self.max_actions = max_actions
         self.max_blocks = max_blocks
         self.obs_type = obs_type
         self.tile_size = 16
-        self.pretrain_version = pretrain_version
         self.render_mode = "human"
-
-        self.splits = {'train': 131072, 'val': 1024, 'test': 1000, 'length3': 1000, 'length+1': 1000}
-        self.set_split('train')
 
         self.class_distributions = {k: {} for k in self.splits.keys()}
 
@@ -67,9 +63,6 @@ class BlocksDataset(MiniGridEnv):
         # self.abs_question_fns = (self.abs_q_shortest_tower, self.abs_q_tallest_tower, self.abs_q_number_of_towers)
         # self.exact_question_fns = (self.exact_position_question,)
 
-    def set_split(self, split):
-        self.curr_split = split
-
     @staticmethod
     def _gen_mission(starting_blocks: List[str], sequence: List[str], question_block: str):
         pass
@@ -88,9 +81,8 @@ class BlocksDataset(MiniGridEnv):
             img = Image.fromarray(obs.transpose(1, 2, 0))
             img.save(f'blocks_dataset/step_{self.step_count}.png')
         elif self.obs_type == 'grid':
-            # obs = self.grid.encode()
-            # # Get rid of walls, get rid of object type and object status (only keep color)
-            # obs = obs[1:-1, 1:-1, 1, np.newaxis]
+            # Do not include walls,
+            # Encode color using one-hot encoding (different channel per color)
             obs = np.zeros((self.size - 2, self.size - 2, self.max_blocks))
             for i, color in enumerate(self.starting_blocks):
                 x, y = self.block_pos[color]
@@ -159,11 +151,13 @@ class BlocksDataset(MiniGridEnv):
             self.is_grabbing_block = False
         elif self.is_grabbing_block:
             # Get each block affected by stack
-            while block is not None:
+            while isinstance(block, Block) or isinstance(block, GrippedBlock):
                 blocks.append(block)
                 # Remove block from previous position
                 self.grid.set(x, y, None)
                 y -= 1
+                if y < 0 or y >= self.height:
+                    print(block, x, y)
                 block = self.grid.get(x, y)
 
             new_x, new_y = action
@@ -191,7 +185,8 @@ class BlocksDataset(MiniGridEnv):
 
     def step(self, _):
         # Get valid block to stack and valid block to stack it onto
-        start_block = np.random.choice(list(self.block_pos.keys()))
+        start_block_index = np.random.randint(len(self.starting_blocks))
+        start_block = self.starting_blocks[start_block_index]
         start_pos = self.block_pos[start_block]
         # for pos in self.block_pos.values():
         #     # Cant stack block onto any block in the blocks current column
@@ -227,9 +222,8 @@ class BlocksDataset(MiniGridEnv):
             self.base_step(action)
 
         # Calculate actions
-        start_idx = (start_pos[0] - 1) * self.max_blocks + (start_pos[1] - 1) # value of 0 - 24
-        end_idx = (end_pos[0] - 1) * self.max_blocks + (end_pos[1] - 1) # value of 0 - 24
-        action_idx = start_idx * self.max_blocks * self.max_blocks + end_idx
+        # end_col - 1 because cols are indexed 1-5 b/c 0 and 6 are walls
+        action_idx = int(start_block_index * (self.size - 2) + (end_col - 1))
         self.traj_actions.append(action_idx)
 
         self.curr_step += 1
@@ -242,22 +236,7 @@ class BlocksDataset(MiniGridEnv):
 
         self.traj_obss.append(self.get_obs())
         if (self.curr_step == self.num_actions):# or len(end_positions) == 0):
-            if self.curr_split in ['pretrain', 'pretrain_val']:
-                self.answer = ''
-            else:
-                # q_probs = {'rel': [1, 0, 0], 'abs': [0, 1, 0], 'exact': [0, 0, 1]}
-                # if self.curr_split in q_probs:
-                #     q_type = np.random.choice(['rel', 'abs', 'exact'], p=q_probs[self.curr_split])
-                # else:
-                #     q_type = np.random.choice(['rel', 'abs', 'exact'])
-
-                # if q_type == 'rel':
-                #     np.random.choice(self.rel_question_fns)()
-                # elif q_type == 'abs':
-                #     np.random.choice(self.abs_question_fns)()
-                # else:
-                #     np.random.choice(self.exact_question_fns)()
-                self.final_state_tallest_tower()
+            self.final_state_tallest_tower()
 
             self.class_distributions[self.curr_split][self.answer] = self.class_distributions[self.curr_split].get(self.answer, 0) + 1
             return {'direction': np.array([]), 'image': np.array([]), 'mission': ''}, 0, True, False, {}
@@ -299,7 +278,8 @@ class BlocksDataset(MiniGridEnv):
             if isinstance(x, Block):
                 blocks_in_stack.append(x.color)
 
-        self.answer = f' The tallest stack is in column {INT_TO_WORD[tallest_col]} and is {len(blocks_in_stack)} block(s) tall. It consists of the '
+        self.answer = f' The tallest stack is in column {INT_TO_WORD[tallest_col]} and is {INT_TO_WORD[len(blocks_in_stack)]} block(s) tall. It consists of the '
+        self.umap_label = INT_TO_WORD[len(blocks_in_stack)]
         if len(blocks_in_stack) == 1:
             self.answer += f'{blocks_in_stack[0]} block.'
             # self.answer += f' Row {row} contains the {", ".join(blocks[0])} blocks.'
@@ -311,7 +291,7 @@ class BlocksDataset(MiniGridEnv):
         self.answer = f' The {self.question_block} block is now in row {INT_TO_WORD[self.size - 1 - y]} and col {INT_TO_WORD[x]}'
 
     def get_trajectory_info(self):
-        return self.mission, self.traj_obss, self.traj_actions, self.answer
+        return self.mission, self.traj_obss, self.traj_actions, self.answer, self.umap_label
 
     def get_class_distributions(self):
         return self.class_distributions
@@ -324,143 +304,4 @@ if __name__ == "__main__":
     from pathlib import Path
     import json
 
-    gym.register(
-        id="BlocksDataset-v0",
-        entry_point="minigrid.envs:BlocksDataset",
-    )
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--env", help="gym environment to load", default="BlocksDataset-v0"
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        help="random seed to generate the environment with",
-        default=None,
-    )
-    parser.add_argument(
-        "--tile-size", type=int, help="size at which to render tiles", default=16
-    )
-    parser.add_argument(
-        "--num-per-obj", type=int, help="Number of instances to create for each color/type combination", default=2
-    )
-    parser.add_argument(
-        "--obs-type",
-        type=str,
-        default="simple",
-        help="Observation type. Can be 'simple', 'grid', 'image'",
-    )
-    parser.add_argument(
-        "--max-verbs",
-        type=int,
-        default="2",
-        help="Maximum number of verbs in mission",
-    )
-    parser.add_argument(
-        "--agent-view",
-        default=False,
-        help="draw the agent sees (partially observable view)",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--pretrain",
-        default=False,
-        help="draw the agent sees (partially observable view)",
-        action="store_true",
-    )
-    parser.add_argument('--base-dir', type=str, default=Path.cwd(),
-                        help='Base directory to save dataset to.')
-
-    args = parser.parse_args()
-    args.base_dir = Path(args.base_dir)
-
-    env: MiniGridEnv = gym.make(args.env, max_actions=args.max_verbs, obs_type=args.obs_type, tile_size=args.tile_size,
-                                pretrain_version=args.pretrain)
-    # + 1 for length generalization
-    metadata = {'obs_type': env.obs_type, 'max_actions': env.max_actions + 1, 'grid_size': (env.size, env.size), 'split_sizes': {}}
-
-    if args.agent_view:
-        print("Using agent view")
-        env = RGBImgPartialObsWrapper(env, env.tile_size)
-        env = ImgObsWrapper(env)
-
-    print('STARTING')
-    ## For examples
-    env.reset(seed=args.seed)
-    done = False
-    while not done:
-        _, _, done, _, _ = env.step(None)
-    mission, obss, actions, answer = env.get_trajectory_info()
-
-    print(mission)
-    # print(obss)
-    print(answer)
-
-    exit(0)
-    #
-    # # env = FullyObsWrapper(env)
-
-    window = Window("minigrid - " + str(env.__class__))
-
-    dataset_name = f'{env.obs_type}_{env.max_actions}verbs'
-    if args.pretrain:
-        dataset_name += '_pretrain'
-    data_dir = Path(args.base_dir / 'blocks_dataset' / 'data' / dataset_name)
-    data_dir.mkdir(parents=True, exist_ok=True)
-    if env.obs_type == 'image':
-        obs_shape = (3, env.tile_size * env.size, env.tile_size * env.size)
-        obs_type = 'float32'
-    elif env.obs_type == 'grid':
-        obs_shape = (env.size - 2, env.size - 2, 5)
-        obs_type = 'int'
-    elif env.obs_type == 'simple':
-        obs_shape = (2)
-        obs_type = 'int'
-    else:
-        obs_shape, obs_type = None, None
-
-    memmap_max_obs = 100000
-
-    metadata['memmap_shape'] = (memmap_max_obs, *obs_shape)
-    metadata['memmap_type'] = obs_type
-    metadata['grid_size'] = (env.size, env.size)
-    for split in env.splits: # 'val'
-        with open(data_dir / f'{split}_dataset.txt', 'w') as dataset_file:
-            offsets = [0]
-            curr_observation_file_idx = 1
-            curr_observation_memmap = np.memmap(str(data_dir / f'obss_{split}_{curr_observation_file_idx}.memmap'),
-                                                dtype=obs_type, mode='w+', shape=(memmap_max_obs, *obs_shape))
-            curr_obs_idx = 0
-            env.set_split(split)
-            num_instances = env.splits[split]  # for each direction
-            print(f'creating {num_instances} for split: {split}')
-            for i in tqdm(range(num_instances)):
-                env.reset(seed=args.seed)
-                done = False
-                while not done:
-                    _, _, done, _, _ = env.step(None)
-                mission, obss, actions, answer = env.get_trajectory_info()
-
-                num_obss = len(obss)
-                traj_str = json.dumps((mission, curr_observation_file_idx, curr_obs_idx, num_obss, actions, answer))
-                dataset_file.write(traj_str)
-                offsets.append(offsets[-1] + len(traj_str))
-                if curr_obs_idx + num_obss >= memmap_max_obs:
-                    curr_observation_file_idx += 1
-                    curr_observation_memmap = np.memmap(
-                        str(data_dir / f'obss_{split}_{curr_observation_file_idx}.memmap'), dtype=obs_type, mode='w+',
-                        shape=(memmap_max_obs, *obs_shape))
-                    curr_obs_idx = 0
-                for obs in obss:
-                    curr_observation_memmap[curr_obs_idx] = obs
-                    curr_obs_idx += 1
-        with open(data_dir / f'{split}_offset.txt', 'w') as offset_file:
-            json.dump(offsets, offset_file)
-        metadata['split_sizes'][split] = num_instances
-        metadata['class_distributions'] = env.get_class_distributions()
-
-    print(metadata['class_distributions'])
-
-    with open(data_dir / f'metadata', 'w') as metadata_file:
-        json.dump(metadata, metadata_file)
