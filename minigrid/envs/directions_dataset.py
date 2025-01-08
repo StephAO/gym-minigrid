@@ -123,6 +123,9 @@ class DirectionsDataset(MiniGridEnv):
         )
         self.actions = DDActions
 
+    def set_split(self, split):
+        self.curr_split = split
+
     @staticmethod
     def _gen_mission(starting_dir: str, sequence: str):
         mission = f'The robot is facing {starting_dir}.'

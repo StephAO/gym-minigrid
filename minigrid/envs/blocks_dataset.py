@@ -46,6 +46,7 @@ class BlocksDataset(MiniGridEnv):
         self.render_mode = "human"
 
         self.class_distributions = {k: {} for k in self.splits.keys()}
+        self.set_split("train")
 
         mission_space = MissionSpace(mission_func=lambda : '')
 
@@ -66,6 +67,9 @@ class BlocksDataset(MiniGridEnv):
     @staticmethod
     def _gen_mission(starting_blocks: List[str], sequence: List[str], question_block: str):
         pass
+
+    def set_split(self, split):
+        self.curr_split = split
 
     def env_pos_to_human_pos(self, pos):
         x, y = pos
@@ -238,7 +242,6 @@ class BlocksDataset(MiniGridEnv):
         if (self.curr_step == self.num_actions):# or len(end_positions) == 0):
             self.final_state_tallest_tower()
 
-            self.class_distributions[self.curr_split][self.answer] = self.class_distributions[self.curr_split].get(self.answer, 0) + 1
             return {'direction': np.array([]), 'image': np.array([]), 'mission': ''}, 0, True, False, {}
         else:
             return {'direction': np.array([]), 'image': np.array([]), 'mission': ''}, 0, False, False, {}
