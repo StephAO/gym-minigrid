@@ -1,4 +1,4 @@
-from numpy import mat, random
+from numpy import random
 from minigrid.minigrid_env import MiniGridEnv
 from minigrid.core.constants import OBJECT_TO_IDX, COLOR_TO_IDX
 from minigrid.core.world_object import WorldObj

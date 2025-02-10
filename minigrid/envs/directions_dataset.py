@@ -81,6 +81,7 @@ class DirectionsDataset(MiniGridEnv):
         self.max_actions = max_actions
         self.obs_type = obs_type
         self.tile_size = 16
+        self.curr_idx = 0
 
         train_size, val_size, test_size, length3_size, lengthp1_size = 131072, 1024, 1000, 1000, 1000
 
@@ -117,7 +118,7 @@ class DirectionsDataset(MiniGridEnv):
             highlight=False,
             # Set this to True for maximum speed
             see_through_walls=True,
-            max_steps=max_verbs * 10,
+            max_steps=max_actions * 10,
             agent_view_size=size,
             **kwargs,
         )
@@ -125,6 +126,7 @@ class DirectionsDataset(MiniGridEnv):
 
     def set_split(self, split):
         self.curr_split = split
+        self.curr_idx = 0
 
     @staticmethod
     def _gen_mission(starting_dir: str, sequence: str):
@@ -250,11 +252,12 @@ class DirectionsDataset(MiniGridEnv):
             if self.curr_verb_step >= len(self.curr_seq):
                 terminated = True
                 self.answer = f'The robot is now facing {DIRECTIONS_IDX_TO_STR[self.agent_dir]}.'
+                self.umap_label = DIRECTIONS_IDX_TO_STR[self.agent_dir]
 
         return obs, reward, terminated, truncated, info
 
     def get_trajectory_info(self):
-        return self.mission, self.traj_obss, self.traj_actions, self.answer, self.answer
+        return self.traj_obss, self.traj_actions, self.mission, self.answer, self.umap_label
 
 
 

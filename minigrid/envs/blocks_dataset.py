@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import itertools
 import numpy as np
+import math
 import os
 from PIL import Image
 import random
@@ -45,7 +46,6 @@ class BlocksDataset(MiniGridEnv):
         self.tile_size = 16
         self.render_mode = "human"
 
-        self.class_distributions = {k: {} for k in self.splits.keys()}
         self.set_split("train")
 
         mission_space = MissionSpace(mission_func=lambda : '')
@@ -97,7 +97,7 @@ class BlocksDataset(MiniGridEnv):
 
     @staticmethod
     def permutations(n, r):
-        return np.math.factorial(n) // np.math.factorial(n - r)
+        return math.factorial(n) // math.factorial(n - r)
 
     def _gen_grid(self, width, height):
         self.grid = Grid(width, height)
@@ -294,11 +294,7 @@ class BlocksDataset(MiniGridEnv):
         self.answer = f' The {self.question_block} block is now in row {INT_TO_WORD[self.size - 1 - y]} and col {INT_TO_WORD[x]}'
 
     def get_trajectory_info(self):
-        return self.mission, self.traj_obss, self.traj_actions, self.answer, self.umap_label
-
-    def get_class_distributions(self):
-        return self.class_distributions
-
+        return self.traj_obss, self.traj_actions, self.mission, self.answer, self.umap_label
 
 if __name__ == "__main__":
     import argparse
