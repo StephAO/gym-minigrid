@@ -133,8 +133,9 @@ class BlocksDataset(MiniGridEnv):
         self.is_grabbing_block = False
         self.curr_step = 0
         self.step_count = 0
-        self.mission = ('A ' + ' '.join([f'{c},' for c in self.starting_blocks[:-1]]) +
+        self.init_phrase = ('A ' + ' '.join([f'{c},' for c in self.starting_blocks[:-1]]) +
                         f' and a {self.starting_blocks[-1]} block start on a table.')
+        self.action_phrases = []
 
 
         self.traj_obss = [self.get_obs()]
@@ -234,9 +235,9 @@ class BlocksDataset(MiniGridEnv):
         rand_verb_phrase = np.random.choice(ACTION_VERBS)
         rand_verb_phrase = rand_verb_phrase.replace('<c1>', c1).replace('<c2>', c2)
         if self.curr_step == 1:
-            self.mission += f' The robot {rand_verb_phrase}.'
+            self.action_phrases.append(f' The robot {rand_verb_phrase}.')
         else:
-            self.mission += f' Then the robot {rand_verb_phrase}.'
+            self.action_phrases.append(f' Then the robot {rand_verb_phrase}.')
 
         self.traj_obss.append(self.get_obs())
         if (self.curr_step == self.num_actions):# or len(end_positions) == 0):
@@ -247,7 +248,7 @@ class BlocksDataset(MiniGridEnv):
             return {'direction': np.array([]), 'image': np.array([]), 'mission': ''}, 0, False, False, {}
 
     def final_state_old(self):
-        self.answer = ''
+        self.outcome_phrase = ''
         for row in range(self.size):
             blocks = []
             cols = []
@@ -258,18 +259,18 @@ class BlocksDataset(MiniGridEnv):
                     cols.append(str(col))
 
             if len(blocks) == 1:
-                self.answer += f' At height {row}, there is the {blocks[0]} block in column {cols[0]}.'
+                self.outcome_phrase += f' At height {row}, there is the {blocks[0]} block in column {cols[0]}.'
                 # self.answer += f' Row {row} contains the {", ".join(blocks[0])} blocks.'
             elif len(blocks) > 0:
-                self.answer += (f' At height {row}, there are the {", ".join(blocks[:-1])}, and {blocks[-1]} blocks'
+                self.outcome_phrase += (f' At height {row}, there are the {", ".join(blocks[:-1])}, and {blocks[-1]} blocks'
                                 f' in columns {", ".join(cols[:-1])}, and {cols[-1]}.')
 
     def final_state(self):
-        self.answer = ' The final block locations are'
+        self.outcome_phrase = ' The final block locations are'
         for i, block in enumerate(self.starting_blocks):
             x, y = self.block_pos[block]
-            self.answer += f' {block} ({x}, {y})'
-            self.answer += ',' if (i + 1) < len(self.starting_blocks) else '.'
+            self.outcome_phrase += f' {block} ({x}, {y})'
+            self.outcome_phrase += ',' if (i + 1) < len(self.starting_blocks) else '.'
 
     def final_state_tallest_tower(self):
         col_heights = [self.get_height_of_stack_in_col(c) for c in range(1, self.width - 1)]
@@ -281,20 +282,20 @@ class BlocksDataset(MiniGridEnv):
             if isinstance(x, Block):
                 blocks_in_stack.append(x.color)
 
-        self.answer = f' The tallest stack is in column {INT_TO_WORD[tallest_col]} and is {INT_TO_WORD[len(blocks_in_stack)]} block(s) tall. It consists of the '
+        self.outcome_phrase = f' The tallest stack is in column {INT_TO_WORD[tallest_col]} and is {INT_TO_WORD[len(blocks_in_stack)]} block(s) tall. It consists of the '
         self.umap_label = INT_TO_WORD[len(blocks_in_stack)]
         if len(blocks_in_stack) == 1:
-            self.answer += f'{blocks_in_stack[0]} block.'
+            self.outcome_phrase += f'{blocks_in_stack[0]} block.'
             # self.answer += f' Row {row} contains the {", ".join(blocks[0])} blocks.'
         else:
-             self.answer += f'{", ".join(blocks_in_stack[:-1])}, and {blocks_in_stack[-1]} blocks.'
+             self.outcome_phrase += f'{", ".join(blocks_in_stack[:-1])}, and {blocks_in_stack[-1]} blocks.'
 
     def exact_position_question(self):
         x, y = self.block_pos[self.question_block]
-        self.answer = f' The {self.question_block} block is now in row {INT_TO_WORD[self.size - 1 - y]} and col {INT_TO_WORD[x]}'
+        self.outcome_phrase = f' The {self.question_block} block is now in row {INT_TO_WORD[self.size - 1 - y]} and col {INT_TO_WORD[x]}'
 
     def get_trajectory_info(self):
-        return self.traj_obss, self.traj_actions, self.mission, self.answer, self.umap_label
+        return self.traj_obss, self.traj_actions, self.init_phrase, self.action_phrases, self.outcome_phrase, self.umap_label
 
 if __name__ == "__main__":
     import argparse

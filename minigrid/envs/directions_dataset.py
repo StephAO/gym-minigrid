@@ -129,14 +129,20 @@ class DirectionsDataset(MiniGridEnv):
         self.curr_idx = 0
 
     @staticmethod
-    def _gen_mission(starting_dir: str, sequence: str):
-        mission = f'The robot is facing {starting_dir}.'
+    def get_init_and_action_phrases(starting_dir: str, sequence: str):
+        init_phrase = f'The robot is facing {starting_dir}.'
+        action_phrases = []
         for i, verb in enumerate(sequence):
             if i == 0:
-                mission += f' The robot {verb}.'
+                action_phrases.append(f' The robot {verb}.')
             else:
-                mission += f' Then the robot {verb}.'
-        return mission
+                action_phrases.append(f' Then the robot {verb}.')
+        return init_phrase, action_phrases
+
+    @staticmethod
+    def _gen_mission(starting_dir: str, sequence: str):
+        init_phrase, action_phrases = DirectionsDataset.get_init_and_action_phrases(starting_dir, sequence)
+        return init_phrase + ''.join(action_phrases)
 
     def get_obs(self):
         if self.obs_type == 'simple':
@@ -183,7 +189,8 @@ class DirectionsDataset(MiniGridEnv):
         self.place_agent(top=((self.size - 1) // 2, (self.size - 1) // 2), size=(1, 1))
 
         self.agent_dir = np.random.randint(len(DIRECTIONS_IDX_TO_STR))
-        self.mission = self._gen_mission(DIRECTIONS_IDX_TO_STR[self.agent_dir], self.curr_seq)
+        self.init_phrase, self.action_phrases = self.get_init_and_action_phrases(DIRECTIONS_IDX_TO_STR[self.agent_dir], self.curr_seq)
+        self.mission = self.init_phrase + ''.join(self.action_phrases)
         self.curr_verb_step = -1
         self.curr_action_step = 0
         self.traj_obss = [self.get_obs()]
@@ -245,19 +252,19 @@ class DirectionsDataset(MiniGridEnv):
         self.curr_action_step += 1
         if len(self.curr_seq) == 0:
             terminated = True
-            self.answer = f'The robot is now facing {DIRECTIONS_IDX_TO_STR[self.agent_dir]}.'
+            self.outcome_phrase = f' The robot is now facing {DIRECTIONS_IDX_TO_STR[self.agent_dir]}.'
         elif self.curr_action_step >= len(ACTION_VERBS[curr_verb]):
             self.curr_action_step = 0
             self.curr_verb_step += 1
             if self.curr_verb_step >= len(self.curr_seq):
                 terminated = True
-                self.answer = f'The robot is now facing {DIRECTIONS_IDX_TO_STR[self.agent_dir]}.'
+                self.outcome_phrase = f' The robot is now facing {DIRECTIONS_IDX_TO_STR[self.agent_dir]}.'
                 self.umap_label = DIRECTIONS_IDX_TO_STR[self.agent_dir]
 
         return obs, reward, terminated, truncated, info
 
     def get_trajectory_info(self):
-        return self.traj_obss, self.traj_actions, self.mission, self.answer, self.umap_label
+        return self.traj_obss, self.traj_actions, self.init_phrase, self.action_phrases, self.outcome_phrase, self.umap_label
 
 
 
