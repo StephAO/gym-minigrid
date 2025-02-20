@@ -29,7 +29,7 @@ ACTION_VERBS = [
                 # 'uses the <c2> block and stacks the <c1> block on it'
                 ]
 
-ALL_COLORS = ['red', 'green', 'blue', 'yellow', 'purple']#, 'cyan', 'purple']
+ALL_COLORS = ['red', 'green', 'blue', 'yellow', 'purple', 'cyan', 'orange', 'white', 'grey', 'black']
 # C1_COLORS = ['red', 'green', 'blue']
 
 class BlocksDataset(MiniGridEnv):
@@ -109,7 +109,7 @@ class BlocksDataset(MiniGridEnv):
         self.grid.wall_rect(0, 0, width, height)
 
         # Get starting blocks
-        self.starting_blocks = copy.deepcopy(ALL_COLORS) #np.random.choice(ALL_COLORS, self.max_blocks, replace=False)
+        self.starting_blocks = np.random.choice(ALL_COLORS, self.max_blocks, replace=False) # copy.deepcopy(ALL_COLORS) #
         self.block_pos = {}
         # Set up blocks
         for i, color in enumerate(self.starting_blocks):
