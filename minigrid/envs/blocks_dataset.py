@@ -29,7 +29,7 @@ ACTION_VERBS = [
                 # 'uses the <c2> block and stacks the <c1> block on it'
                 ]
 
-ALL_COLORS = ['red', 'green', 'blue', 'yellow', 'purple', 'cyan', 'orange', 'white', 'grey', 'black']
+ALL_COLORS = ['red', 'green', 'blue', 'yellow', 'purple']#, 'cyan', 'orange', 'white']#, 'grey', 'brown']
 # C1_COLORS = ['red', 'green', 'blue']
 
 class BlocksDataset(MiniGridEnv):
@@ -283,7 +283,8 @@ class BlocksDataset(MiniGridEnv):
                 blocks_in_stack.append(x.color)
 
         self.outcome_phrase = f' The tallest stack is in column {INT_TO_WORD[tallest_col]} and is {INT_TO_WORD[len(blocks_in_stack)]} block(s) tall. It consists of the '
-        self.umap_label = INT_TO_WORD[len(blocks_in_stack)]
+        self.umap_label = str(tallest_col * 5 + len(blocks_in_stack)) #INT_TO_WORD[tallest_col]
+        #self.umap_label = INT_TO_WORD[len(blocks_in_stack)]
         if len(blocks_in_stack) == 1:
             self.outcome_phrase += f'{blocks_in_stack[0]} block.'
             # self.answer += f' Row {row} contains the {", ".join(blocks[0])} blocks.'
