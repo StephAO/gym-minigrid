@@ -283,7 +283,7 @@ class BlocksDataset(MiniGridEnv):
                 blocks_in_stack.append(x.color)
 
         self.outcome_phrase = f' The tallest stack is in column {INT_TO_WORD[tallest_col]} and is {INT_TO_WORD[len(blocks_in_stack)]} block(s) tall. It consists of the '
-        self.umap_label = str(tallest_col * 5 + len(blocks_in_stack)) #INT_TO_WORD[tallest_col]
+        self.umap_label = str((tallest_col - 1) * 5 + len(blocks_in_stack)) #INT_TO_WORD[tallest_col]
         #self.umap_label = INT_TO_WORD[len(blocks_in_stack)]
         if len(blocks_in_stack) == 1:
             self.outcome_phrase += f'{blocks_in_stack[0]} block.'
