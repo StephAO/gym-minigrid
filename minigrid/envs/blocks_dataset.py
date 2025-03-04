@@ -117,15 +117,12 @@ class BlocksDataset(MiniGridEnv):
             self.block_pos[color] = (i + 1, self.height - 2)
 
         # Pick number of actions
-        if self.curr_split in 'length3':
-            self.num_actions = 3
-        elif self.curr_split == 'length+1':
-            self.num_actions = self.max_actions + 1
+        if 'length' in self.curr_split:
+            added_actions = self.curr_split.split('+')[-1]
+            self.num_actions = self.max_actions + int(added_actions)
         else:
             num_actions_p = np.array([self.permutations(self.max_blocks, i) for i in range(1, self.max_actions + 1)],
                                      dtype=float)
-            # 3 is used for generalization testing
-            num_actions_p[2] = 0
             num_actions_p = num_actions_p / np.sum(num_actions_p)
             self.num_actions = np.random.choice(np.arange(1, self.max_actions + 1), p=num_actions_p)
 

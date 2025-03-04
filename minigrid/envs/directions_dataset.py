@@ -83,26 +83,27 @@ class DirectionsDataset(MiniGridEnv):
         self.tile_size = 16
         self.curr_idx = 0
 
-        train_size, val_size, test_size, length3_size, lengthp1_size = 131072, 1024, 1000, 1000, 1000
+        train_size, val_size, test_size, lengthN_sizes = 131072, 1024, 1000, 1000
 
         # Base sequences
         base_sequences = []
         for i in range(1, max_actions + 1):
-            if i != 3:
-                base_sequences += list(itertools.product(ACTION_VERBS.keys(), repeat=i))
+            base_sequences += list(itertools.product(ACTION_VERBS.keys(), repeat=i))
         random.shuffle(base_sequences)
-
-        length3_seqs = list(itertools.product(ACTION_VERBS.keys(), repeat=3))
-        random.shuffle(length3_seqs)
-        length3_seqs = length3_seqs[:length3_size]
-        lengthp1_seqs = list(itertools.product(ACTION_VERBS.keys(), repeat=max_actions + 1))
-        random.shuffle(lengthp1_seqs)
-        lengthp1_seqs = lengthp1_seqs[:lengthp1_size]
 
         self.splits = {'train': base_sequences[:train_size],
                        'val': base_sequences[train_size:train_size + val_size],
-                       'test': base_sequences[train_size + val_size:train_size + val_size + test_size],
-                       'length3': length3_seqs, 'length+1': lengthp1_seqs}
+                       'test': base_sequences[train_size + val_size:train_size + val_size + test_size]}
+        
+        for i in range(1, max_actions + 1):
+            # pick i random actions
+            lengthN_seqs = []
+            ACTION_VERBS_LIST = list(ACTION_VERBS.keys())
+            for _ in range(lengthN_sizes):
+                action_indices = np.random.choice(range(len(ACTION_VERBS_LIST)), size=i, replace=True)
+                actions = [ACTION_VERBS_LIST[action_index] for action_index in action_indices]
+                lengthN_seqs.append(actions)
+            self.splits[f'length+{i}'] = lengthN_seqs
 
         self.set_split('train')
 
