@@ -83,7 +83,7 @@ class DirectionsDataset(MiniGridEnv):
         self.tile_size = 16
         self.curr_idx = 0
 
-        train_size, val_size, test_size, lengthN_sizes = 131072, 1024, 1000, 1000
+        train_size, val_size, test_size, icl_examples, lengthN_sizes = 131072, 1024, 1000, 10, 1000
 
         # Base sequences
         base_sequences = []
@@ -93,7 +93,8 @@ class DirectionsDataset(MiniGridEnv):
 
         self.splits = {'train': base_sequences[:train_size],
                        'val': base_sequences[train_size:train_size + val_size],
-                       'test': base_sequences[train_size + val_size:train_size + val_size + test_size]}
+                       'test': base_sequences[train_size + val_size:train_size + val_size + test_size],
+                       'icl_examples': base_sequences[train_size + val_size + test_size:train_size + val_size + test_size + icl_examples]}
         
         for i in range(1, max_actions + 1):
             # pick i random actions
