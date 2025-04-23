@@ -45,21 +45,21 @@ LL_ACTION_VERBS = {'turn left': [DDActions.left], 'turn right': [DDActions.right
                    'rotate 270 degrees counterclockwise': [DDActions.left, DDActions.left, DDActions.left],
                    }
 
-HL_ACTION_VERBS = {'turn left': [DDActions.left], 'turn right': [DDActions.right], 'go straight': [DDActions.stay],
-                   'turn around': [DDActions.turn_around],
-                   'turn 90 degrees clockwise': [DDActions.right],
-                   'turn 180 degrees clockwise': [DDActions.turn_around],
-                   'turn 270 degrees clockwise': [DDActions.left],
-                   'turn 360 degrees clockwise': [DDActions.stay],
+HL_ACTION_VERBS = {'turns left': [DDActions.left], 'turns right': [DDActions.right], 'goes straight': [DDActions.stay],
+                   'turns around': [DDActions.turn_around],
+                   'turns 90 degrees clockwise': [DDActions.right],
+                   'turns 180 degrees clockwise': [DDActions.turn_around],
+                   'turns 270 degrees clockwise': [DDActions.left],
+                   'turns 360 degrees clockwise': [DDActions.stay],
 
                    # 'rotate 90 degrees clockwise': [DDActions.right],
                    # 'rotate 180 degrees clockwise': [DDActions.turn_around],
                    # 'rotate 270 degrees clockwise': [DDActions.left],
 
-                   'turn 90 degrees counterclockwise': [DDActions.left],
-                   'turn 180 degrees counterclockwise': [DDActions.turn_around],
-                   'turn 270 degrees counterclockwise': [DDActions.right],
-                   'turn 360 degrees counterclockwise': [DDActions.stay],
+                   'turns 90 degrees counterclockwise': [DDActions.left],
+                   'turns 180 degrees counterclockwise': [DDActions.turn_around],
+                   'turns 270 degrees counterclockwise': [DDActions.right],
+                   'turns 360 degrees counterclockwise': [DDActions.stay],
 
                    # 'rotate 180 degrees counterclockwise': [DDActions.turn_around],
                    # 'rotate 270 degrees counterclockwise': [DDActions.right],
@@ -76,11 +76,11 @@ class DirectionsDataset(MiniGridEnv):
     named using an English text string
     """
 
-    def __init__(self, size=3, max_actions=2, obs_type='grid', **kwargs):
+    def __init__(self, size=3, max_actions=2, obs_type='grid', tile_size=16, **kwargs):
         self.size = size
         self.max_actions = max_actions
         self.obs_type = obs_type
-        self.tile_size = 16
+        self.tile_size = tile_size
         self.curr_idx = 0
 
         train_size, val_size, test_size, icl_examples, lengthN_sizes = 131072, 1024, 1000, 10, 1000
@@ -150,9 +150,9 @@ class DirectionsDataset(MiniGridEnv):
         if self.obs_type == 'simple':
             obs = np.eye(4)[self.agent_dir].tolist()
         elif self.obs_type == 'image':
-            obs = self.get_frame(agent_pov=True, highlight=False, tile_size=self.tile_size).transpose(2, 0, 1)
+            obs = self.get_frame(agent_pov=True, highlight=False, tile_size=64).transpose(2, 0, 1)
             img = Image.fromarray(obs.transpose(1, 2, 0))
-            img.save(f'directions_dataset/step_{self.curr_verb_step + 1}.png')
+            img.save(f'example_images/directions/step_{self.curr_verb_step + 1}.png')
             # img = Image.fromarray(obs)
             # img.show()
         elif self.obs_type == 'grid':
@@ -271,3 +271,28 @@ class DirectionsDataset(MiniGridEnv):
 
 
 
+if __name__ == "__main__":
+        import gymnasium as gym
+        import matplotlib.pyplot as plt
+        import numpy as np
+            
+        gym.register(
+            id="DirectionsDataset-v0",
+            entry_point="minigrid.envs:DirectionsDataset",
+        )
+
+        env: MiniGridEnv = gym.make('DirectionsDataset-v0', max_actions=5,
+                                    obs_type='image', tile_size=64)
+        
+
+        print('CREATING VISUAL EXAMPLE')
+        ## For examples
+        env.reset(seed=42)
+        done = False
+        while not done:
+            _, _, done, _, _ = env.step(None)
+        states, actions, init_phrase, action_phrases, outcome_phrase, umap_label = env.env.env.get_trajectory_info()
+        print(f"Initial phrase: {init_phrase}")
+        combined_action_phrases = ' '.join(action_phrases)
+        print(f"Action phrases: {combined_action_phrases}")
+        print(f"Outcome phrase: {outcome_phrase}")

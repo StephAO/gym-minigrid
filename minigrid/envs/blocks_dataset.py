@@ -83,14 +83,21 @@ class BlocksDataset(MiniGridEnv):
         elif self.obs_type == 'image':
             obs = self.grid.render(64, (-1, -1)).transpose(2, 0, 1)
             img = Image.fromarray(obs.transpose(1, 2, 0))
-            img.save(f'blocks_dataset/step_{self.step_count}.png')
-        elif self.obs_type == 'grid':
+            img.save(f'example_images/blocks/step_{self.step_count}.png')
+        elif self.obs_type == 'grid_one_hot':
             # Do not include walls,
             # Encode color using one-hot encoding (different channel per color)
-            obs = np.zeros((self.size - 2, self.size - 2, self.max_blocks))
+            obs = np.zeros((self.size - 2, self.size - 2, len(ALL_COLORS) + 1))
             for i, color in enumerate(self.starting_blocks):
                 x, y = self.block_pos[color]
-                obs[y - 1, x - 1, i] = 1
+                color_idx = COLOR_TO_IDX[str(color)]
+                obs[y - 1, x - 1, color_idx] = 1
+        elif self.obs_type == 'grid':
+            obs = np.zeros((self.size - 2, self.size - 2))
+            for i, color in enumerate(self.starting_blocks):
+                x, y = self.block_pos[color]
+                color_idx = COLOR_TO_IDX[str(color)]
+                obs[y - 1, x - 1] = color_idx
         else:
             raise NotImplementedError(f'{self.obs_type} is not a supporter observation type')
         return obs
@@ -130,8 +137,8 @@ class BlocksDataset(MiniGridEnv):
         self.is_grabbing_block = False
         self.curr_step = 0
         self.step_count = 0
-        self.init_phrase = ('A ' + ' '.join([f'{c},' for c in self.starting_blocks[:-1]]) +
-                        f' and a {self.starting_blocks[-1]} block start on a table.')
+        self.init_phrase = (' '.join([f'a {c},' for c in self.starting_blocks[:-1]]) +
+                        f' and a {self.starting_blocks[-1]} block start in columns one through five respectively.').capitalize()
         self.action_phrases = []
 
 
@@ -279,7 +286,8 @@ class BlocksDataset(MiniGridEnv):
             if isinstance(x, Block):
                 blocks_in_stack.append(x.color)
 
-        self.outcome_phrase = f' The tallest stack is in column {INT_TO_WORD[tallest_col]} and is {INT_TO_WORD[len(blocks_in_stack)]} block(s) tall. It consists of the '
+        block_s = 'block' if len(blocks_in_stack) == 1 else 'blocks'
+        self.outcome_phrase = f' The tallest stack is in column {INT_TO_WORD[tallest_col]} and is {INT_TO_WORD[len(blocks_in_stack)]} {block_s} tall. It consists of the '
         self.umap_label = str((tallest_col - 1) * 5 + len(blocks_in_stack)) #INT_TO_WORD[tallest_col]
         #self.umap_label = INT_TO_WORD[len(blocks_in_stack)]
         if len(blocks_in_stack) == 1:
@@ -296,10 +304,28 @@ class BlocksDataset(MiniGridEnv):
         return self.traj_obss, self.traj_actions, self.init_phrase, self.action_phrases, self.outcome_phrase, self.umap_label
 
 if __name__ == "__main__":
-    import argparse
-    import gymnasium as gym
-    from minigrid.utils.window import Window
-    from pathlib import Path
-    import json
+        import gymnasium as gym
+        import matplotlib.pyplot as plt
+        import numpy as np
+            
+        gym.register(
+            id="BlocksDataset-v0",
+            entry_point="minigrid.envs:BlocksDataset",
+        )
 
+        env: MiniGridEnv = gym.make('BlocksDataset-v0', max_blocks=5, max_actions=5,
+                                    obs_type='image', tile_size=32)
+        
 
+        print('CREATING VISUAL EXAMPLE')
+        ## For examples
+        env.reset(seed=42)
+        done = False
+        while not done:
+            _, _, done, _, _ = env.step(None)
+        states, actions, init_phrase, action_phrases, outcome_phrase, umap_label = env.env.env.get_trajectory_info()
+        print(f"Initial phrase: {init_phrase}")
+        combined_action_phrases = ' '.join(action_phrases)
+        print(f"Action phrases: {combined_action_phrases}")
+        print(f"Outcome phrase: {outcome_phrase}")
+        
