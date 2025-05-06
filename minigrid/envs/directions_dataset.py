@@ -29,6 +29,7 @@ class DDActions(IntEnum):
 USE_HIGH_LEVEL_ACTIONS = True
 LL_ACTION_VERBS = {'turn left': [DDActions.left], 'turn right': [DDActions.right], 'go straight': [DDActions.stay],
                    'turn around': [DDActions.right, DDActions.right],
+
                    'turn 90 degrees clockwise': [DDActions.right],
                    'turn 180 degrees clockwise': [DDActions.right, DDActions.right],
                    'turn 270 degrees clockwise': [DDActions.right, DDActions.right, DDActions.right],
@@ -45,8 +46,13 @@ LL_ACTION_VERBS = {'turn left': [DDActions.left], 'turn right': [DDActions.right
                    'rotate 270 degrees counterclockwise': [DDActions.left, DDActions.left, DDActions.left],
                    }
 
-HL_ACTION_VERBS = {'turns left': [DDActions.left], 'turns right': [DDActions.right], 'goes straight': [DDActions.stay],
+HL_ACTION_VERBS = {'does nothing': [DDActions.stay],
+                   
+                   'turns left': [DDActions.left], 
+                   'turns right': [DDActions.right], 
+                   'goes straight': [DDActions.stay],
                    'turns around': [DDActions.turn_around],
+
                    'turns 90 degrees clockwise': [DDActions.right],
                    'turns 180 degrees clockwise': [DDActions.turn_around],
                    'turns 270 degrees clockwise': [DDActions.left],
@@ -90,6 +96,8 @@ class DirectionsDataset(MiniGridEnv):
         for i in range(1, max_actions + 1):
             base_sequences += list(itertools.product(ACTION_VERBS.keys(), repeat=i))
         random.shuffle(base_sequences)
+
+        print(len(base_sequences))
 
         self.splits = {'train': base_sequences[:train_size],
                        'val': base_sequences[train_size:train_size + val_size],
