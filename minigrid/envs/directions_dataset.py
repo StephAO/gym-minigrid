@@ -83,7 +83,7 @@ class DirectionsDataset(MiniGridEnv):
         self.tile_size = tile_size
         self.curr_idx = 0
 
-        train_size, val_size, test_size, icl_examples, lengthN_sizes = 131072, 1024, 1000, 10, 1000
+        train_size, val_size, test_size, icl_examples, lengthN_sizes = 262144, 10000, 1000, 10, 2000
 
         # Base sequences
         base_sequences = []
