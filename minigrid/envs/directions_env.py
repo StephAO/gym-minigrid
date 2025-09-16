@@ -76,7 +76,7 @@ ACTION_VERBS = HL_ACTION_VERBS if USE_HIGH_LEVEL_ACTIONS else LL_ACTION_VERBS
 DIRECTIONS_IDX_TO_STR = ['east', 'south', 'west', 'north']
 
 
-class DirectionsDataset(MiniGridEnv):
+class DirectionsEnv(MiniGridEnv):
     """
     Environment in which the agent is instructed to go to a given object
     named using an English text string
@@ -151,7 +151,7 @@ class DirectionsDataset(MiniGridEnv):
 
     @staticmethod
     def _gen_mission(starting_dir: str, sequence: str):
-        init_phrase, action_phrases = DirectionsDataset.get_init_and_action_phrases(starting_dir, sequence)
+        init_phrase, action_phrases = DirectionsEnv.get_init_and_action_phrases(starting_dir, sequence)
         return init_phrase + ''.join(action_phrases)
 
     def get_obs(self):
@@ -269,12 +269,11 @@ class DirectionsDataset(MiniGridEnv):
             if self.curr_verb_step >= len(self.curr_seq):
                 terminated = True
                 self.outcome_phrase = f' The robot is now facing {DIRECTIONS_IDX_TO_STR[self.agent_dir]}.'
-                self.umap_label = DIRECTIONS_IDX_TO_STR[self.agent_dir]
 
         return obs, reward, terminated, truncated, info
 
     def get_trajectory_info(self):
-        return self.traj_obss, self.traj_actions, self.init_phrase, self.action_phrases, self.outcome_phrase, self.umap_label
+        return self.traj_obss, self.traj_actions, self.init_phrase, self.action_phrases, self.outcome_phrase
 
 
 
@@ -285,11 +284,11 @@ if __name__ == "__main__":
         import numpy as np
             
         gym.register(
-            id="DirectionsDataset-v0",
-            entry_point="minigrid.envs:DirectionsDataset",
+            id="DirectionsEnv-v0",
+            entry_point="minigrid.envs:DirectionsEnv",
         )
 
-        env: MiniGridEnv = gym.make('DirectionsDataset-v0', max_actions=5,
+        env: MiniGridEnv = gym.make('DirectionsEnv-v0', max_actions=5,
                                     obs_type='image', tile_size=64)
         
 
@@ -299,7 +298,7 @@ if __name__ == "__main__":
         done = False
         while not done:
             _, _, done, _, _ = env.step(None)
-        states, actions, init_phrase, action_phrases, outcome_phrase, umap_label = env.env.env.get_trajectory_info()
+        states, actions, init_phrase, action_phrases, outcome_phrase = env.env.env.get_trajectory_info()
         print(f"Initial phrase: {init_phrase}")
         combined_action_phrases = ' '.join(action_phrases)
         print(f"Action phrases: {combined_action_phrases}")

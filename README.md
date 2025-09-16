@@ -1,3 +1,11 @@
+# ReSEED Minigrid
+This is a fork of the [Minigrid](https://github.com/Farama-Foundation/Minigrid) library, with two new environments that are used for the ReSEED paper (TODO link repo).
+The two new environments are:
+- DirectionDataset: An environment of trajectories about cardinal directions, used as the basis for ABCDs dataset.
+- BlocksDataset: An environment of trajectories about stacking blocks on top of each other. Used for the CUBES dataset.
+
+Below is the readme from the original Minigrid library.
+
 <p align="center">
     <img src="https://raw.githubusercontent.com/Farama-Foundation/Minigrid/master/minigrid-text.png" width="500px"/>
 </p>

@@ -32,7 +32,7 @@ ACTION_VERBS = [
 ALL_COLORS = ['red', 'green', 'blue', 'yellow', 'purple']#, 'cyan', 'orange', 'white']#, 'grey', 'brown']
 # C1_COLORS = ['red', 'green', 'blue']
 
-class BlocksDataset(MiniGridEnv):
+class BlocksEnv(MiniGridEnv):
     """
     Environment in which the agent is instructed to go to a given object
     named using an English text string
@@ -288,8 +288,6 @@ class BlocksDataset(MiniGridEnv):
 
         block_s = 'block' if len(blocks_in_stack) == 1 else 'blocks'
         self.outcome_phrase = f' The tallest stack is in column {INT_TO_WORD[tallest_col]} and is {INT_TO_WORD[len(blocks_in_stack)]} {block_s} tall. It consists of the '
-        self.umap_label = str((tallest_col - 1) * 5 + len(blocks_in_stack)) #INT_TO_WORD[tallest_col]
-        #self.umap_label = INT_TO_WORD[len(blocks_in_stack)]
         if len(blocks_in_stack) == 1:
             self.outcome_phrase += f'{blocks_in_stack[0]} block.'
             # self.answer += f' Row {row} contains the {", ".join(blocks[0])} blocks.'
@@ -301,7 +299,7 @@ class BlocksDataset(MiniGridEnv):
         self.outcome_phrase = f' The {self.question_block} block is now in row {INT_TO_WORD[self.size - 1 - y]} and col {INT_TO_WORD[x]}'
 
     def get_trajectory_info(self):
-        return self.traj_obss, self.traj_actions, self.init_phrase, self.action_phrases, self.outcome_phrase, self.umap_label
+        return self.traj_obss, self.traj_actions, self.init_phrase, self.action_phrases, self.outcome_phrase
 
 if __name__ == "__main__":
         import gymnasium as gym
@@ -309,11 +307,11 @@ if __name__ == "__main__":
         import numpy as np
             
         gym.register(
-            id="BlocksDataset-v0",
-            entry_point="minigrid.envs:BlocksDataset",
+            id="BlocksEnv-v0",
+            entry_point="minigrid.envs:BlocksEnv",
         )
 
-        env: MiniGridEnv = gym.make('BlocksDataset-v0', max_blocks=5, max_actions=5,
+        env: MiniGridEnv = gym.make('BlocksEnv-v0', max_blocks=5, max_actions=5,
                                     obs_type='image', tile_size=32)
         
 
@@ -323,7 +321,7 @@ if __name__ == "__main__":
         done = False
         while not done:
             _, _, done, _, _ = env.step(None)
-        states, actions, init_phrase, action_phrases, outcome_phrase, umap_label = env.env.env.get_trajectory_info()
+        states, actions, init_phrase, action_phrases, outcome_phrase = env.env.env.get_trajectory_info()
         print(f"Initial phrase: {init_phrase}")
         combined_action_phrases = ' '.join(action_phrases)
         print(f"Action phrases: {combined_action_phrases}")
